@@ -1,7 +1,7 @@
-wxPython>=4.2
-sounddevice>=0.4
-numpy>=1.26
-accessible_output3
+wxPython>=4.2.2
+sounddevice>=0.5.0
+numpy>=2.0.0
+accessible-output3>=0.1.2
 
 # Opcional, solo para compilar la extensión nativa en motor_rust/ (véase README.md)
 # maturin>=1.5,<2.0

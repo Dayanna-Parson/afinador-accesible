@@ -10,8 +10,13 @@ Afinador cromático de escritorio para Windows, accesible por diseño para perso
 ## Instalación
 
 ```
-pip install -r requirements.txt
+git clone https://github.com/Dayanna-Parson/afinador-accesible.git
+cd afinador-accesible
+pip install -r requisitos.txt
+python iniciar_afinador.py
 ```
+
+En Windows también puedes ejecutar `INICIAR_AFINADOR.bat` una vez instalados los requisitos.
 
 ### Extensión nativa opcional (Rust)
 
@@ -46,11 +51,13 @@ app/
 └── interfaz_gui.py    # Ventana principal wxPython
 motor_rust/             # Extensión nativa opcional: captura de audio (cpal) + YIN, vía PyO3
 iniciar_afinador.py     # Punto de entrada
+requisitos.txt          # Dependencias de Python
+INICIAR_AFINADOR.bat    # Lanzador para Windows
 ```
 
 ## Instrumentos soportados
 
 - Cromático (cualquier nota)
-- Lira de 16 cuerdas (afinación diatónica por defecto, editable)
-- Ukelele (afinación reentrante estándar)
-- Guitarra (afinación estándar de 6 cuerdas)
+- Lira de 16 cuerdas (Aklot): diatónica en Do mayor, Sol3 a La5
+- Ukelele: Sol4, Do4, Mi4, La4 (GCEA reentrante estándar)
+- Guitarra: Mi2, La2, Re3, Sol3, Si3, Mi4 (afinación estándar)
