@@ -29,11 +29,11 @@ CROMATICO = "Cromático (cualquier nota)"
 
 PRESETS_INSTRUMENTO = {
     CROMATICO: None,
-    "Lira de 16 cuerdas": [
-        ("Cuerda 1", 0, 3), ("Cuerda 2", 2, 3), ("Cuerda 3", 4, 3), ("Cuerda 4", 5, 3),
-        ("Cuerda 5", 7, 3), ("Cuerda 6", 9, 3), ("Cuerda 7", 11, 3), ("Cuerda 8", 0, 4),
-        ("Cuerda 9", 2, 4), ("Cuerda 10", 4, 4), ("Cuerda 11", 5, 4), ("Cuerda 12", 7, 4),
-        ("Cuerda 13", 9, 4), ("Cuerda 14", 11, 4), ("Cuerda 15", 0, 5), ("Cuerda 16", 2, 5),
+    "Lira de 16 cuerdas (Aklot)": [
+        ("Cuerda 1 (Sol)", 7, 3), ("Cuerda 2 (La)", 9, 3), ("Cuerda 3 (Si)", 11, 3), ("Cuerda 4 (Do)", 0, 4),
+        ("Cuerda 5 (Re)", 2, 4), ("Cuerda 6 (Mi)", 4, 4), ("Cuerda 7 (Fa)", 5, 4), ("Cuerda 8 (Sol)", 7, 4),
+        ("Cuerda 9 (La)", 9, 4), ("Cuerda 10 (Si)", 11, 4), ("Cuerda 11 (Do)", 0, 5), ("Cuerda 12 (Re)", 2, 5),
+        ("Cuerda 13 (Mi)", 4, 5), ("Cuerda 14 (Fa)", 5, 5), ("Cuerda 15 (Sol)", 7, 5), ("Cuerda 16 (La)", 9, 5),
     ],
     "Ukelele": [
         ("Cuerda 1 (Sol)", 7, 4), ("Cuerda 2 (Do)", 0, 4),
