@@ -172,6 +172,7 @@ class _CapturadorYINPuroPython:
                  umbral_yin=0.15, umbral_rms=0.02, al_detectar=None):
         self.indice_dispositivo = indice_dispositivo
         self.tasa_muestreo = tasa_muestreo or self._tasa_muestreo_defecto(indice_dispositivo)
+        self.canales = self._canales_defecto(indice_dispositivo)
         self.duracion_ventana = duracion_ventana
         self.tamano_ventana = max(int(self.tasa_muestreo * duracion_ventana), 1024)
         self.umbral_yin = umbral_yin
@@ -193,20 +194,34 @@ class _CapturadorYINPuroPython:
             logger.exception("no se pudo consultar la tasa de muestreo por defecto del dispositivo")
             return 44100
 
+    @staticmethod
+    def _canales_defecto(indice_dispositivo):
+        """Algunos dispositivos compuestos (p. ej. "Varios micrófonos" de Windows, que
+        combina varios elementos de un array con su propio procesamiento) solo entregan
+        la señal real si se abren con todos sus canales; forzar un único canal puede dejar
+        la captura casi muda aunque el dispositivo funcione bien en otras aplicaciones."""
+        try:
+            info = sd.query_devices(indice_dispositivo, "input")
+            return max(int(info["max_input_channels"]), 1)
+        except Exception:
+            logger.exception("no se pudo consultar el número de canales del dispositivo")
+            return 1
+
     def _callback_audio(self, indata, marcos, tiempo_info, estado):
         if estado:
             logger.warning("estado del flujo de entrada de audio: %s", estado)
         if self._pausado.is_set():
             return
+        mono = indata.mean(axis=1) if indata.shape[1] > 1 else indata[:, 0]
         try:
-            self._cola.put_nowait(indata[:, 0].copy())
+            self._cola.put_nowait(mono.copy())
         except queue.Full:
             try:
                 self._cola.get_nowait()
             except queue.Empty:
                 pass
             try:
-                self._cola.put_nowait(indata[:, 0].copy())
+                self._cola.put_nowait(mono.copy())
             except queue.Full:
                 pass
 
@@ -239,7 +254,7 @@ class _CapturadorYINPuroPython:
         self._hilo_analisis.start()
         self._flujo = sd.InputStream(
             device=self.indice_dispositivo,
-            channels=1,
+            channels=self.canales,
             samplerate=self.tasa_muestreo,
             blocksize=self.tamano_ventana,
             callback=self._callback_audio,

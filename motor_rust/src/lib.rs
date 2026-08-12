@@ -221,7 +221,16 @@ impl CapturadorYinRust {
                         if pausado_audio.load(Ordering::Relaxed) {
                             return;
                         }
-                        let mono: Vec<f32> = datos.chunks(canales).map(|marco| marco[0]).collect();
+                        // Se promedian todos los canales en vez de tomar solo el primero:
+                        // algunos dispositivos compuestos (arrays de varios micrófonos con
+                        // procesamiento propio de Windows) reparten la señal útil entre
+                        // canales, y quedarse solo con el canal 0 puede dejar la captura
+                        // prácticamente muda aunque el dispositivo funcione bien en otras
+                        // aplicaciones.
+                        let mono: Vec<f32> = datos
+                            .chunks(canales)
+                            .map(|marco| marco.iter().sum::<f32>() / marco.len() as f32)
+                            .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
                     err_fn,
@@ -233,7 +242,10 @@ impl CapturadorYinRust {
                         if pausado_audio.load(Ordering::Relaxed) {
                             return;
                         }
-                        let mono: Vec<f32> = datos.chunks(canales).map(|marco| marco[0].to_float_sample()).collect();
+                        let mono: Vec<f32> = datos
+                            .chunks(canales)
+                            .map(|marco| marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32)
+                            .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
                     err_fn,
@@ -245,7 +257,10 @@ impl CapturadorYinRust {
                         if pausado_audio.load(Ordering::Relaxed) {
                             return;
                         }
-                        let mono: Vec<f32> = datos.chunks(canales).map(|marco| marco[0].to_float_sample()).collect();
+                        let mono: Vec<f32> = datos
+                            .chunks(canales)
+                            .map(|marco| marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32)
+                            .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
                     err_fn,
@@ -257,7 +272,10 @@ impl CapturadorYinRust {
                         if pausado_audio.load(Ordering::Relaxed) {
                             return;
                         }
-                        let mono: Vec<f32> = datos.chunks(canales).map(|marco| marco[0].to_float_sample()).collect();
+                        let mono: Vec<f32> = datos
+                            .chunks(canales)
+                            .map(|marco| marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32)
+                            .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
                     err_fn,
@@ -269,7 +287,10 @@ impl CapturadorYinRust {
                         if pausado_audio.load(Ordering::Relaxed) {
                             return;
                         }
-                        let mono: Vec<f32> = datos.chunks(canales).map(|marco| marco[0].to_float_sample()).collect();
+                        let mono: Vec<f32> = datos
+                            .chunks(canales)
+                            .map(|marco| marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32)
+                            .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
                     err_fn,
