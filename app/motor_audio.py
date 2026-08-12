@@ -39,15 +39,36 @@ def listar_dispositivos_entrada():
             {"indice": indice, "nombre": nombre, "tasa_muestreo_defecto": tasa}
             for indice, nombre, tasa in _motor_rust.listar_dispositivos_entrada()
         ]
+    indice_api_wasapi = _indice_hostapi_wasapi()
     dispositivos = []
     for indice, info in enumerate(sd.query_devices()):
-        if info.get("max_input_channels", 0) > 0:
-            dispositivos.append({
-                "indice": indice,
-                "nombre": info["name"],
-                "tasa_muestreo_defecto": int(info["default_samplerate"]),
-            })
+        if info.get("max_input_channels", 0) <= 0:
+            continue
+        if indice_api_wasapi is not None and info.get("hostapi") != indice_api_wasapi:
+            # PortAudio suele listar el mismo micrófono varias veces, una por cada API de
+            # sonido (MME, DirectSound, WASAPI, WDM-KS), con nombres casi idénticos. Se
+            # muestra solo la entrada WASAPI cuando existe: es la API moderna que usa el
+            # propio Windows y la mayoría de aplicaciones, y evita duplicados confusos que
+            # pueden capturar audio de forma distinta al resto del sistema.
+            continue
+        dispositivos.append({
+            "indice": indice,
+            "nombre": info["name"],
+            "tasa_muestreo_defecto": int(info["default_samplerate"]),
+        })
     return dispositivos
+
+
+def _indice_hostapi_wasapi():
+    try:
+        apis = sd.query_hostapis()
+    except Exception:
+        logger.exception("no se pudieron consultar las APIs de audio del sistema")
+        return None
+    for indice, api in enumerate(apis):
+        if "wasapi" in api.get("name", "").lower():
+            return indice
+    return None
 
 
 def frecuencia_a_nota(frecuencia):

@@ -313,8 +313,9 @@ class VentanaPrincipal(wx.Frame):
                            "Error de audio", wx.OK | wx.ICON_ERROR)
             return
         logger.info(
-            "Escucha iniciada: dispositivo=%s tasa_muestreo=%s duracion_ventana=%s backend=%s",
-            indice_dispositivo, tasa_muestreo, duracion_ventana, self.capturador.backend,
+            "Escucha iniciada: dispositivo=%s (indice=%s) tasa_muestreo=%s duracion_ventana=%s backend=%s",
+            self._nombre_dispositivo_seleccionado(), indice_dispositivo, tasa_muestreo, duracion_ventana,
+            self.capturador.backend,
         )
         self.generador_tonos.capturador = self.capturador
         self.boton_escucha.SetLabel("Detener escucha (Ctrl+E)")

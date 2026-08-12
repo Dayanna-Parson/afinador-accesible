@@ -207,6 +207,7 @@ impl CapturadorYinRust {
 
         let (tx_muestras, rx_muestras) = sync_channel::<Vec<f32>>(4);
         let (tx_control, rx_control) = std::sync::mpsc::channel::<ComandoCaptura>();
+        let (tx_arranque, rx_arranque) = std::sync::mpsc::channel::<Result<(), String>>();
         let pausado_audio = Arc::clone(&self.pausado);
 
         let stream_config: cpal::StreamConfig = config.into();
@@ -250,8 +251,34 @@ impl CapturadorYinRust {
                     err_fn,
                     None,
                 ),
+                SampleFormat::I32 => dispositivo.build_input_stream(
+                    &stream_config,
+                    move |datos: &[i32], _| {
+                        if pausado_audio.load(Ordering::Relaxed) {
+                            return;
+                        }
+                        let mono: Vec<f32> = datos.chunks(canales).map(|marco| marco[0].to_float_sample()).collect();
+                        let _ = tx_muestras.try_send(mono);
+                    },
+                    err_fn,
+                    None,
+                ),
+                SampleFormat::U32 => dispositivo.build_input_stream(
+                    &stream_config,
+                    move |datos: &[u32], _| {
+                        if pausado_audio.load(Ordering::Relaxed) {
+                            return;
+                        }
+                        let mono: Vec<f32> = datos.chunks(canales).map(|marco| marco[0].to_float_sample()).collect();
+                        let _ = tx_muestras.try_send(mono);
+                    },
+                    err_fn,
+                    None,
+                ),
                 otro => {
-                    eprintln!("formato de muestra no soportado: {otro:?}");
+                    let mensaje = format!("formato de muestra del dispositivo no soportado: {otro:?}");
+                    eprintln!("{mensaje}");
+                    let _ = tx_arranque.send(Err(mensaje));
                     return;
                 }
             };
@@ -259,20 +286,39 @@ impl CapturadorYinRust {
             let flujo = match resultado_flujo {
                 Ok(flujo) => flujo,
                 Err(error) => {
-                    eprintln!("no se pudo construir el flujo de entrada: {error}");
+                    let mensaje = format!("no se pudo construir el flujo de entrada: {error}");
+                    eprintln!("{mensaje}");
+                    let _ = tx_arranque.send(Err(mensaje));
                     return;
                 }
             };
 
             if let Err(error) = flujo.play() {
-                eprintln!("no se pudo iniciar el flujo de entrada: {error}");
+                let mensaje = format!("no se pudo iniciar el flujo de entrada: {error}");
+                eprintln!("{mensaje}");
+                let _ = tx_arranque.send(Err(mensaje));
                 return;
             }
+
+            let _ = tx_arranque.send(Ok(()));
 
             // El flujo debe permanecer vivo en este hilo hasta recibir la orden de detener.
             let _ = rx_control.recv();
             drop(flujo);
         });
+
+        match rx_arranque.recv_timeout(Duration::from_secs(5)) {
+            Ok(Ok(())) => {}
+            Ok(Err(mensaje)) => {
+                let _ = hilo_audio.join();
+                return Err(PyRuntimeError::new_err(mensaje));
+            }
+            Err(_) => {
+                return Err(PyRuntimeError::new_err(
+                    "el hilo de captura de audio no confirmó su arranque a tiempo",
+                ));
+            }
+        }
 
         let callback = Python::with_gil(|py| self.callback.clone_ref(py));
         let umbral_yin = self.umbral_yin;
