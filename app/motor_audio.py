@@ -252,14 +252,47 @@ class _CapturadorYINPuroPython:
         self._pausado.clear()
         self._hilo_analisis = threading.Thread(target=self._bucle_analisis, daemon=True)
         self._hilo_analisis.start()
-        self._flujo = sd.InputStream(
+        argumentos_flujo = dict(
             device=self.indice_dispositivo,
             channels=self.canales,
             samplerate=self.tasa_muestreo,
             blocksize=self.tamano_ventana,
             callback=self._callback_audio,
         )
+
+        ajustes_exclusivos_wasapi = self._ajustes_exclusivos_wasapi()
+        if ajustes_exclusivos_wasapi is not None:
+            try:
+                self._flujo = sd.InputStream(extra_settings=ajustes_exclusivos_wasapi, **argumentos_flujo)
+                self._flujo.start()
+                logger.info("Captura abierta en modo exclusivo WASAPI (sin procesamiento de Windows)")
+                return
+            except Exception:
+                logger.warning(
+                    "no se pudo abrir el dispositivo en modo exclusivo WASAPI; se usa el modo "
+                    "compartido habitual, con el procesamiento de audio de Windows activo",
+                    exc_info=True,
+                )
+                self._flujo = None
+
+        self._flujo = sd.InputStream(**argumentos_flujo)
         self._flujo.start()
+
+    @staticmethod
+    def _ajustes_exclusivos_wasapi():
+        """El modo compartido de WASAPI pasa el audio por la cadena de mejoras de Windows
+        (reducción de ruido, cancelación de eco, optimizaciones de voz), pensada para
+        llamadas y dictado por voz, que puede atenuar o filtrar el sonido de un
+        instrumento acústico. El modo exclusivo entrega el audio crudo del hardware,
+        sin ese procesamiento. Solo se intenta si el sistema tiene realmente WASAPI
+        (Windows); en cualquier otro caso se devuelve None y se usa el modo habitual."""
+        if _indice_hostapi_wasapi() is None:
+            return None
+        try:
+            return sd.WasapiSettings(exclusive=True)
+        except Exception:
+            logger.exception("no se pudo construir la configuración exclusiva de WASAPI")
+            return None
 
     def detener(self):
         if self._flujo is not None:
