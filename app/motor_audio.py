@@ -271,6 +271,11 @@ class CapturadorYIN:
                 al_detectar=al_detectar,
             )
 
+    @property
+    def backend(self):
+        """Devuelve "rust" o "python" según el backend de captura realmente en uso."""
+        return self._backend
+
     def _al_detectar_rust(self, frecuencia, rms):
         resultado = frecuencia_a_nota(frecuencia) if frecuencia else None
         if self.al_detectar:
@@ -300,10 +305,21 @@ class GeneradorTonos:
         self.tasa_muestreo = tasa_muestreo
         self._hilo_reproduccion = None
 
+    @staticmethod
+    def _compensar_percepcion_grave(frecuencia, amplitud):
+        """Las frecuencias graves se perciben más flojas a igual amplitud (curvas isofónicas)
+        y además los altavoces pequeños las reproducen peor; se compensa subiendo el nivel
+        de las notas por debajo de 200 Hz, sin llegar a saturar la onda."""
+        if frecuencia >= 200.0:
+            return amplitud
+        factor = 1.0 + (200.0 - frecuencia) / 200.0
+        return min(amplitud * factor, 0.95)
+
     def _generar_onda(self, frecuencia, duracion, amplitud=0.3):
         muestras = int(self.tasa_muestreo * duracion)
         tiempo = np.linspace(0, duracion, muestras, endpoint=False)
-        onda = amplitud * np.sin(2 * np.pi * frecuencia * tiempo)
+        amplitud_efectiva = self._compensar_percepcion_grave(frecuencia, amplitud)
+        onda = amplitud_efectiva * np.sin(2 * np.pi * frecuencia * tiempo)
         rampa = min(int(self.tasa_muestreo * 0.01), muestras // 2)
         if rampa > 0:
             envolvente = np.ones(muestras)
@@ -326,7 +342,7 @@ class GeneradorTonos:
             if al_finalizar:
                 al_finalizar()
 
-    def reproducir(self, frecuencia, duracion=2.0, amplitud=0.3, al_finalizar=None):
+    def reproducir(self, frecuencia, duracion=2.0, amplitud=0.45, al_finalizar=None):
         """Reproduce el tono en un hilo secundario, pausando la captura mientras suena."""
         self._hilo_reproduccion = threading.Thread(
             target=self._reproducir_bloqueante,

@@ -63,6 +63,9 @@ OPCIONES_DURACION_VENTANA = [
 ID_ATAJO_REPRODUCIR_REFERENCIA = wx.NewIdRef()
 ID_ATAJO_ALTERNAR_ESCUCHA = wx.NewIdRef()
 
+NIVEL_MINIMO_SENAL_DIAGNOSTICO = 0.01
+SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL = 4.0
+
 
 # ANCLAJE_INICIO: ventana_principal
 class VentanaPrincipal(wx.Frame):
@@ -115,6 +118,7 @@ class VentanaPrincipal(wx.Frame):
 
         self.etiqueta_nota = wx.StaticText(panel, label="Nota detectada: —")
         self.etiqueta_instruccion = wx.StaticText(panel, label="Instrucción: —")
+        self.etiqueta_nivel = wx.StaticText(panel, label="Nivel de entrada: —")
 
         self.boton_escucha = wx.Button(panel, label="Iniciar escucha (Ctrl+E)")
         self.boton_escucha.Bind(wx.EVT_BUTTON, self._al_alternar_escucha)
@@ -128,7 +132,7 @@ class VentanaPrincipal(wx.Frame):
             etiqueta_buffer, self.selector_buffer,
             etiqueta_instrumento, self.selector_instrumento,
             etiqueta_cuerda, self.selector_cuerda,
-            self.etiqueta_nota, self.etiqueta_instruccion,
+            self.etiqueta_nota, self.etiqueta_instruccion, self.etiqueta_nivel,
             self.boton_escucha, self.boton_referencia,
         ):
             distribucion.Add(widget, 0, wx.ALL | wx.EXPAND, 8)
@@ -275,10 +279,13 @@ class VentanaPrincipal(wx.Frame):
             self._detener_escucha()
 
     def _iniciar_escucha(self):
+        indice_dispositivo = self._indice_dispositivo_seleccionado()
+        tasa_muestreo = self._tasa_muestreo_seleccionada()
+        duracion_ventana = self._duracion_ventana_seleccionada()
         self.capturador = CapturadorYIN(
-            indice_dispositivo=self._indice_dispositivo_seleccionado(),
-            tasa_muestreo=self._tasa_muestreo_seleccionada(),
-            duracion_ventana=self._duracion_ventana_seleccionada(),
+            indice_dispositivo=indice_dispositivo,
+            tasa_muestreo=tasa_muestreo,
+            duracion_ventana=duracion_ventana,
             al_detectar=self._al_detectar_tono,
         )
         try:
@@ -289,23 +296,52 @@ class VentanaPrincipal(wx.Frame):
             wx.MessageBox("No se pudo iniciar el dispositivo de entrada seleccionado.",
                            "Error de audio", wx.OK | wx.ICON_ERROR)
             return
+        logger.info(
+            "Escucha iniciada: dispositivo=%s tasa_muestreo=%s duracion_ventana=%s backend=%s",
+            indice_dispositivo, tasa_muestreo, duracion_ventana, self.capturador.backend,
+        )
         self.generador_tonos.capturador = self.capturador
         self.boton_escucha.SetLabel("Detener escucha (Ctrl+E)")
         self.anunciador.reiniciar_estado()
+        self._nivel_maximo_observado = 0.0
+        self._temporizador_diagnostico = wx.CallLater(
+            int(SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL * 1000), self._comprobar_senal_de_audio
+        )
 
     def _detener_escucha(self):
+        if getattr(self, "_temporizador_diagnostico", None) is not None:
+            self._temporizador_diagnostico.Stop()
+            self._temporizador_diagnostico = None
         if self.capturador is not None:
             self.capturador.detener()
+            logger.info("Escucha detenida")
             self.capturador = None
             self.generador_tonos.capturador = None
         self.boton_escucha.SetLabel("Iniciar escucha (Ctrl+E)")
         self.etiqueta_nota.SetLabel("Nota detectada: —")
         self.etiqueta_instruccion.SetLabel("Instrucción: —")
+        self.etiqueta_nivel.SetLabel("Nivel de entrada: —")
+
+    def _comprobar_senal_de_audio(self):
+        if self.capturador is None:
+            return
+        if self._nivel_maximo_observado < NIVEL_MINIMO_SENAL_DIAGNOSTICO:
+            logger.warning(
+                "No se detectó señal de audio por encima de %.4f tras %.0f segundos",
+                NIVEL_MINIMO_SENAL_DIAGNOSTICO, SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL,
+            )
+            self.anunciador.hablar(
+                "No se detecta señal del micrófono. Comprueba que el dispositivo "
+                "seleccionado sea el correcto y que no esté silenciado en Windows."
+            )
 
     def _al_detectar_tono(self, resultado, rms):
-        wx.CallAfter(self._actualizar_deteccion, resultado)
+        wx.CallAfter(self._actualizar_deteccion, resultado, rms)
 
-    def _actualizar_deteccion(self, resultado):
+    def _actualizar_deteccion(self, resultado, rms):
+        self._nivel_maximo_observado = max(getattr(self, "_nivel_maximo_observado", 0.0), rms)
+        self.etiqueta_nivel.SetLabel("Nivel de entrada: {:.3f}".format(rms))
+
         if resultado is None:
             self.etiqueta_nota.SetLabel("Nota detectada: —")
             self.etiqueta_instruccion.SetLabel("Instrucción: —")
