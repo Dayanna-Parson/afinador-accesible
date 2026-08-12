@@ -1,0 +1,4 @@
+wxPython>=4.2
+sounddevice>=0.4
+numpy>=1.26
+accessible_output3
