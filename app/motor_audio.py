@@ -8,6 +8,13 @@ import time
 import numpy as np
 import sounddevice as sd
 
+try:
+    import motor_rust as _motor_rust
+    _RUST_DISPONIBLE = True
+except ImportError:
+    _motor_rust = None
+    _RUST_DISPONIBLE = False
+
 logger = logging.getLogger(__name__)
 
 FRECUENCIA_LA4 = 440.0
@@ -16,7 +23,17 @@ INDICE_LA = 9
 
 
 def listar_dispositivos_entrada():
-    """Devuelve los dispositivos de audio con al menos un canal de entrada disponible."""
+    """Devuelve los dispositivos de audio con al menos un canal de entrada disponible.
+
+    Cuando la extensión nativa (motor_rust, backend cpal) está disponible, los índices
+    se enumeran desde ahí, porque son los que después usará CapturadorYIN para abrir el
+    dispositivo real; no coinciden necesariamente con los índices de sounddevice/PortAudio.
+    """
+    if _RUST_DISPONIBLE:
+        return [
+            {"indice": indice, "nombre": nombre, "tasa_muestreo_defecto": tasa}
+            for indice, nombre, tasa in _motor_rust.listar_dispositivos_entrada()
+        ]
     dispositivos = []
     for indice, info in enumerate(sd.query_devices()):
         if info.get("max_input_channels", 0) > 0:
@@ -118,8 +135,12 @@ def estimar_frecuencia_yin(senal, tasa_muestreo, umbral=0.15, f_min=60.0, f_max=
     return tasa_muestreo / retardo_final
 
 
-class CapturadorYIN:
-    """Captura audio en un hilo secundario y estima el tono mediante YIN con puerta de ruido."""
+class _CapturadorYINPuroPython:
+    """Captura audio en un hilo secundario y estima el tono mediante YIN con puerta de ruido.
+
+    Implementación 100% Python con sounddevice, usada como respaldo cuando la extensión
+    nativa `motor_rust` (cpal + YIN en Rust) no está compilada para la plataforma actual.
+    """
 
     def __init__(self, indice_dispositivo=None, tasa_muestreo=44100, duracion_ventana=0.1,
                  umbral_yin=0.15, umbral_rms=0.02, al_detectar=None):
@@ -205,6 +226,52 @@ class CapturadorYIN:
 
     def reanudar(self):
         self._pausado.clear()
+
+
+class CapturadorYIN:
+    """Captura de audio y detección de tono con la misma interfaz pública sin importar el backend.
+
+    Usa la extensión nativa `motor_rust` (cpal + YIN en Rust) cuando está compilada e instalada,
+    por su menor latencia y acceso más directo al dispositivo (WASAPI en Windows). Si no está
+    disponible, recurre de forma transparente a la implementación en Python puro con sounddevice.
+    """
+
+    def __init__(self, indice_dispositivo=None, tasa_muestreo=44100, duracion_ventana=0.1,
+                 umbral_yin=0.15, umbral_rms=0.02, al_detectar=None):
+        self.al_detectar = al_detectar
+        if _RUST_DISPONIBLE:
+            self._backend = "rust"
+            self._nucleo = _motor_rust.CapturadorYinRust(
+                self._al_detectar_rust, indice_dispositivo, umbral_yin, umbral_rms
+            )
+        else:
+            self._backend = "python"
+            self._nucleo = _CapturadorYINPuroPython(
+                indice_dispositivo=indice_dispositivo,
+                tasa_muestreo=tasa_muestreo,
+                duracion_ventana=duracion_ventana,
+                umbral_yin=umbral_yin,
+                umbral_rms=umbral_rms,
+                al_detectar=al_detectar,
+            )
+
+    def _al_detectar_rust(self, frecuencia, rms):
+        resultado = frecuencia_a_nota(frecuencia) if frecuencia else None
+        if self.al_detectar:
+            self.al_detectar(resultado, rms)
+
+    def iniciar(self):
+        self._nucleo.iniciar()
+
+    def detener(self):
+        self._nucleo.detener()
+
+    def pausar(self):
+        """Suspende la captura sin cerrar el flujo, para evitar retroalimentación acústica."""
+        self._nucleo.pausar()
+
+    def reanudar(self):
+        self._nucleo.reanudar()
 # ANCLAJE_FIN: capturador_yin
 
 
