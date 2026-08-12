@@ -52,6 +52,23 @@ El dispositivo de entrada, la tasa de muestreo, el tamaño de búfer, el instrum
 cuerda seleccionados se guardan automáticamente en `configuraciones/ajustes.json` y se
 restauran al volver a abrir la aplicación.
 
+## Diagnóstico de nivel de entrada
+
+La etiqueta "Nivel de entrada" muestra en vivo el volumen (RMS) que está captando el
+micrófono, para comprobar visualmente si hay señal. Si tras iniciar la escucha no se
+detecta ninguna señal en unos segundos, la app lo anuncia por voz (puede indicar que el
+dispositivo seleccionado no es el correcto, o que está silenciado a nivel de Windows).
+
+En Windows, al iniciar la escucha también se comprueba automáticamente si el micrófono
+seleccionado está silenciado a nivel de sistema y, si lo está, se desmutea solo (requiere
+`pycaw`, instalado por defecto en Windows vía `requisitos.txt`).
+
+## Avance automático de cuerda
+
+Al mantener la afinación correcta ("AFINADA") de forma estable durante poco más de un
+segundo, el selector de cuerda avanza automáticamente a la siguiente de la lista (no
+aplica en modo Cromático, que no tiene una secuencia de cuerdas).
+
 ## Pruebas
 
 ```
@@ -67,6 +84,7 @@ app/
 ├── conector_nvda.py   # Salida de voz al lector de pantalla activo, con throttling por estabilidad
 ├── interfaz_gui.py    # Ventana principal wxPython
 ├── gestor_ajustes.py  # Persistencia atómica de ajustes en configuraciones/ajustes.json
+├── control_microfono.py  # Desmute automático del micrófono a nivel de Windows (pycaw)
 └── config_rutas.py    # Rutas absolutas del proyecto
 motor_rust/             # Extensión nativa opcional: captura de audio (cpal) + YIN, vía PyO3
 tests/                  # Pruebas del algoritmo YIN y la lógica de notas/instrucciones

@@ -1,6 +1,7 @@
 """Ventana principal accesible del afinador cromático."""
 
 import logging
+import time
 
 import numpy as np
 import wx
@@ -13,6 +14,7 @@ from app.motor_audio import (
     nota_a_frecuencia,
 )
 from app.conector_nvda import AnunciadorNVDA
+from app.control_microfono import asegurar_microfono_activo
 from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
 
 logger = logging.getLogger(__name__)
@@ -65,6 +67,7 @@ ID_ATAJO_ALTERNAR_ESCUCHA = wx.NewIdRef()
 
 NIVEL_MINIMO_SENAL_DIAGNOSTICO = 0.01
 SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL = 4.0
+SEGUNDOS_ESTABLE_PARA_AVANZAR = 1.2
 
 
 # ANCLAJE_INICIO: ventana_principal
@@ -79,6 +82,8 @@ class VentanaPrincipal(wx.Frame):
         self.capturador = None
         self.generador_tonos = GeneradorTonos(tasa_muestreo=44100)
         self._confirmacion_pendiente = True
+        self._afinada_desde = None
+        self._avance_ya_realizado = False
 
         self._construir_controles()
         self._construir_atajos()
@@ -232,12 +237,16 @@ class VentanaPrincipal(wx.Frame):
             self.selector_cuerda.SetSelection(0)
             self.selector_cuerda.Enable()
         self.anunciador.reiniciar_estado()
+        self._afinada_desde = None
+        self._avance_ya_realizado = False
         if evento is not None:
             self._guardar_ajustes_actuales()
             evento.Skip()
 
     def _al_cambiar_cuerda(self, evento):
         self.anunciador.reiniciar_estado()
+        self._afinada_desde = None
+        self._avance_ya_realizado = False
         self._guardar_ajustes_actuales()
         evento.Skip()
 
@@ -272,6 +281,12 @@ class VentanaPrincipal(wx.Frame):
             return None
         return self.dispositivos[posicion]["indice"]
 
+    def _nombre_dispositivo_seleccionado(self):
+        posicion = self.selector_dispositivo.GetSelection()
+        if posicion == wx.NOT_FOUND or not self.dispositivos:
+            return None
+        return self.dispositivos[posicion]["nombre"]
+
     def _al_alternar_escucha(self, evento):
         if self.capturador is None:
             self._iniciar_escucha()
@@ -279,6 +294,7 @@ class VentanaPrincipal(wx.Frame):
             self._detener_escucha()
 
     def _iniciar_escucha(self):
+        asegurar_microfono_activo(self._nombre_dispositivo_seleccionado())
         indice_dispositivo = self._indice_dispositivo_seleccionado()
         tasa_muestreo = self._tasa_muestreo_seleccionada()
         duracion_ventana = self._duracion_ventana_seleccionada()
@@ -366,10 +382,35 @@ class VentanaPrincipal(wx.Frame):
 
         if instruccion != "AFINADA":
             self._confirmacion_pendiente = True
+            self._afinada_desde = None
+            self._avance_ya_realizado = False
         self.anunciador.procesar_instruccion(texto_instruccion)
         if instruccion == "AFINADA" and self._confirmacion_pendiente:
             self._confirmacion_pendiente = False
             self.generador_tonos.reproducir_confirmacion()
+
+        if instruccion == "AFINADA" and cuerda_objetivo is not None and not self._avance_ya_realizado:
+            if self._afinada_desde is None:
+                self._afinada_desde = time.monotonic()
+            elif time.monotonic() - self._afinada_desde >= SEGUNDOS_ESTABLE_PARA_AVANZAR:
+                self._avance_ya_realizado = True
+                self._avanzar_a_siguiente_cuerda()
+
+    def _avanzar_a_siguiente_cuerda(self):
+        total_cuerdas = self.selector_cuerda.GetCount()
+        posicion_actual = self.selector_cuerda.GetSelection()
+        if posicion_actual == wx.NOT_FOUND or total_cuerdas == 0:
+            return
+        siguiente_posicion = posicion_actual + 1
+        if siguiente_posicion >= total_cuerdas:
+            self.anunciador.hablar("Última cuerda afinada.")
+            return
+        self.selector_cuerda.SetSelection(siguiente_posicion)
+        self.anunciador.reiniciar_estado()
+        self._afinada_desde = None
+        self._confirmacion_pendiente = True
+        self._guardar_ajustes_actuales()
+        self.anunciador.hablar("Siguiente: {}".format(self.selector_cuerda.GetStringSelection()))
 
     def _al_reproducir_referencia(self, evento):
         cuerda_objetivo = self._cuerda_objetivo()

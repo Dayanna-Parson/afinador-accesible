@@ -82,6 +82,8 @@ app/
 ├── interfaz_gui.py     # VentanaPrincipal: wx.Frame raíz, presets de instrumento, flujo de captura
 ├── gestor_ajustes.py    # cargar_ajustes()/guardar_ajustes(): persistencia atómica en
 │                        # configuraciones/ajustes.json
+├── control_microfono.py # asegurar_microfono_activo(): desmute automático a nivel de
+│                        # Windows con pycaw, opcional y con fallo silencioso
 └── config_rutas.py      # RAIZ, RUTA_CONFIGURACIONES, RUTA_AJUSTES (rutas absolutas)
 motor_rust/
 ├── Cargo.toml
@@ -131,13 +133,16 @@ Toda actualización de UI ocurre en el hilo principal. La captura de audio corre
 
 ```python
 def _al_detectar_tono(self, resultado, rms):
-    wx.CallAfter(self._actualizar_deteccion, resultado)
+    wx.CallAfter(self._actualizar_deteccion, resultado, rms)
 ```
 
 No actualices controles wx directamente desde el hilo de audio ni desde el callback que llega del backend Rust. Produce crashes impredecibles con NVDA activo.
 
+### Diagnóstico de nivel de entrada: nunca fallar en silencio
+El `rms` llega en todos los callbacks de detección, aunque no haya nota detectada (por debajo del umbral). `VentanaPrincipal` lo usa para mantener visible el nivel de entrada en todo momento y para avisar por voz si tras `SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL` no se ha detectado ninguna señal real — porque para una usuaria ciega, una app que "no dice nada" es indistinguible de una app rota. Cualquier función nueva de captura debe seguir exponiendo el nivel de señal en vez de limitarse a silenciar cuando no hay nota.
+
 ### Retroalimentación acústica: pausar la captura al reproducir tonos
-`GeneradorTonos.reproducir()` siempre pausa el capturador activo (`capturador.pausar()`) antes de reproducir y lo reanuda (`capturador.reanudar()`) al terminar, para que el algoritmo no confunda el altavoz con la cuerda. Cualquier nueva vía de reproducción de audio debe respetar este mismo patrón.
+`GeneradorTonos.reproducir()` siempre pausa el capturador activo (`capturador.pausar()`) antes de reproducir y lo reanuda (`capturador.reanudar()`) al terminar, para que el algoritmo no confunda el altavoz con la cuerda. Cualquier nueva vía de reproducción de audio debe respetar este mismo patrón. Las frecuencias graves (por debajo de 200 Hz) reciben además una compensación de amplitud en `GeneradorTonos._compensar_percepcion_grave()`, porque a igual amplitud se perciben más flojas y los altavoces pequeños las reproducen peor.
 
 ### Anuncios por voz: throttling obligatorio
 Ninguna instrucción de afinación se anuncia por voz de forma inmediata. `AnunciadorNVDA.procesar_instruccion()` exige que el mensaje lleve estable un mínimo de 350 ms y que difiera del último ya pronunciado. No llames a `AnunciadorNVDA.hablar()` directamente desde el bucle de detección de tono — pasa siempre por `procesar_instruccion()`, o la app satura la cola de voz del lector de pantalla en cuanto la señal esté un poco inestable.
