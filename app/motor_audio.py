@@ -10,6 +10,11 @@ import sounddevice as sd
 
 try:
     import motor_rust as _motor_rust
+    if not hasattr(_motor_rust, "CapturadorYinRust"):
+        # Si el proyecto se ejecuta desde la raíz del repositorio y la extensión no está
+        # compilada, Python puede confundir la carpeta fuente motor_rust/ con un paquete
+        # real (paquete de espacio de nombres, sin contenido). No es la extensión válida.
+        raise ImportError("el módulo motor_rust encontrado no es la extensión compilada")
     _RUST_DISPONIBLE = True
 except ImportError:
     _motor_rust = None
