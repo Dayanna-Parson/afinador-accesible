@@ -66,8 +66,15 @@ ID_ATAJO_REPRODUCIR_REFERENCIA = wx.NewIdRef()
 ID_ATAJO_ALTERNAR_ESCUCHA = wx.NewIdRef()
 
 NIVEL_MINIMO_SENAL_DIAGNOSTICO = 0.01
+NIVEL_SENAL_BUENA = 0.08
 SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL = 4.0
 SEGUNDOS_ESTABLE_PARA_AVANZAR = 1.2
+
+TEXTOS_CATEGORIA_NIVEL = {
+    "sin_senal": "Sin señal.",
+    "senal_debil": "Señal débil.",
+    "senal_buena": "Señal buena.",
+}
 
 
 # ANCLAJE_INICIO: ventana_principal
@@ -84,6 +91,8 @@ class VentanaPrincipal(wx.Frame):
         self._confirmacion_pendiente = True
         self._afinada_desde = None
         self._avance_ya_realizado = False
+        self._ultima_categoria_nivel = None
+        self._marca_tiempo_ultimo_anuncio_nivel = 0.0
 
         self._construir_controles()
         self._construir_atajos()
@@ -321,6 +330,8 @@ class VentanaPrincipal(wx.Frame):
         self.boton_escucha.SetLabel("Detener escucha (Ctrl+E)")
         self.anunciador.reiniciar_estado()
         self._nivel_maximo_observado = 0.0
+        self._ultima_categoria_nivel = None
+        self._marca_tiempo_ultimo_anuncio_nivel = 0.0
         self._temporizador_diagnostico = wx.CallLater(
             int(SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL * 1000), self._comprobar_senal_de_audio
         )
@@ -355,9 +366,30 @@ class VentanaPrincipal(wx.Frame):
     def _al_detectar_tono(self, resultado, rms):
         wx.CallAfter(self._actualizar_deteccion, resultado, rms)
 
+    @staticmethod
+    def _categoria_nivel(rms):
+        if rms < NIVEL_MINIMO_SENAL_DIAGNOSTICO:
+            return "sin_senal"
+        if rms < NIVEL_SENAL_BUENA:
+            return "senal_debil"
+        return "senal_buena"
+
     def _actualizar_deteccion(self, resultado, rms):
         self._nivel_maximo_observado = max(getattr(self, "_nivel_maximo_observado", 0.0), rms)
         self.etiqueta_nivel.SetLabel("Nivel de entrada: {:.3f}".format(rms))
+
+        ahora = time.monotonic()
+        if ahora - getattr(self, "_marca_tiempo_ultimo_log_nivel", 0.0) >= 1.0:
+            self._marca_tiempo_ultimo_log_nivel = ahora
+            nombre_nota = "{}{}".format(resultado["nombre"], resultado["octava"]) if resultado else "ninguna"
+            logger.info("Nivel actual: rms=%.4f nota=%s", rms, nombre_nota)
+
+        categoria_nivel = self._categoria_nivel(rms)
+        if (categoria_nivel != self._ultima_categoria_nivel
+                and ahora - getattr(self, "_marca_tiempo_ultimo_anuncio_nivel", 0.0) >= 1.0):
+            self._ultima_categoria_nivel = categoria_nivel
+            self._marca_tiempo_ultimo_anuncio_nivel = ahora
+            self.anunciador.hablar(TEXTOS_CATEGORIA_NIVEL[categoria_nivel])
 
         if resultado is None:
             self.etiqueta_nota.SetLabel("Nota detectada: —")
