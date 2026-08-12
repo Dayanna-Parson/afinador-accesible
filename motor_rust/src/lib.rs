@@ -124,6 +124,8 @@ struct CapturadorYinRust {
     indice_dispositivo: Option<usize>,
     umbral_yin: f32,
     umbral_rms: f32,
+    tasa_muestreo_deseada: Option<u32>,
+    duracion_ventana: f32,
     callback: Py<PyAny>,
     pausado: Arc<AtomicBool>,
     detener_analisis: Arc<AtomicBool>,
@@ -132,15 +134,43 @@ struct CapturadorYinRust {
     hilo_analisis: Option<JoinHandle<()>>,
 }
 
+/// Busca entre las configuraciones soportadas por el dispositivo una que cubra la tasa de
+/// muestreo pedida; si no se pide ninguna en concreto o no hay ninguna que la cubra, usa la
+/// configuración por defecto del dispositivo.
+fn resolver_config_entrada(
+    dispositivo: &cpal::Device,
+    tasa_muestreo_deseada: Option<u32>,
+) -> Result<cpal::SupportedStreamConfig, String> {
+    if let Some(tasa) = tasa_muestreo_deseada {
+        let candidata = dispositivo
+            .supported_input_configs()
+            .map_err(|error| error.to_string())?
+            .find(|rango| rango.min_sample_rate().0 <= tasa && tasa <= rango.max_sample_rate().0);
+        if let Some(rango) = candidata {
+            return Ok(rango.with_sample_rate(cpal::SampleRate(tasa)));
+        }
+    }
+    dispositivo.default_input_config().map_err(|error| error.to_string())
+}
+
 #[pymethods]
 impl CapturadorYinRust {
     #[new]
-    #[pyo3(signature = (callback, indice_dispositivo=None, umbral_yin=0.15, umbral_rms=0.02))]
-    fn nuevo(callback: Py<PyAny>, indice_dispositivo: Option<usize>, umbral_yin: f32, umbral_rms: f32) -> Self {
+    #[pyo3(signature = (callback, indice_dispositivo=None, umbral_yin=0.15, umbral_rms=0.02, tasa_muestreo_deseada=None, duracion_ventana=DURACION_VENTANA_SEGUNDOS))]
+    fn nuevo(
+        callback: Py<PyAny>,
+        indice_dispositivo: Option<usize>,
+        umbral_yin: f32,
+        umbral_rms: f32,
+        tasa_muestreo_deseada: Option<u32>,
+        duracion_ventana: f32,
+    ) -> Self {
         CapturadorYinRust {
             indice_dispositivo,
             umbral_yin,
             umbral_rms,
+            tasa_muestreo_deseada,
+            duracion_ventana,
             callback,
             pausado: Arc::new(AtomicBool::new(false)),
             detener_analisis: Arc::new(AtomicBool::new(false)),
@@ -167,14 +197,13 @@ impl CapturadorYinRust {
                 .ok_or_else(|| PyRuntimeError::new_err("no hay dispositivo de entrada por defecto"))?,
         };
 
-        let config = dispositivo
-            .default_input_config()
+        let config = resolver_config_entrada(&dispositivo, self.tasa_muestreo_deseada)
             .map_err(|error| PyRuntimeError::new_err(format!("no se pudo leer la configuración del dispositivo: {error}")))?;
 
         let tasa_muestreo = config.sample_rate().0 as f32;
         let canales = config.channels() as usize;
         let formato_muestra = config.sample_format();
-        let tamano_ventana = ((tasa_muestreo * DURACION_VENTANA_SEGUNDOS) as usize).max(1024);
+        let tamano_ventana = ((tasa_muestreo * self.duracion_ventana) as usize).max(1024);
 
         let (tx_muestras, rx_muestras) = sync_channel::<Vec<f32>>(4);
         let (tx_control, rx_control) = std::sync::mpsc::channel::<ComandoCaptura>();

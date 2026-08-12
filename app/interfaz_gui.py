@@ -13,6 +13,7 @@ from app.motor_audio import (
     nota_a_frecuencia,
 )
 from app.conector_nvda import AnunciadorNVDA
+from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
 
 logger = logging.getLogger(__name__)
 
@@ -45,22 +46,41 @@ PRESETS_INSTRUMENTO = {
     ],
 }
 
+OPCIONES_TASA_MUESTREO = [
+    ("Automática (recomendada)", None),
+    ("44100 Hz", 44100),
+    ("48000 Hz", 48000),
+    ("96000 Hz", 96000),
+    ("192000 Hz", 192000),
+]
+
+OPCIONES_DURACION_VENTANA = [
+    ("Baja latencia (50 ms)", 0.05),
+    ("Equilibrada (100 ms)", 0.1),
+    ("Alta precisión, notas graves (200 ms)", 0.2),
+]
+
+ID_ATAJO_REPRODUCIR_REFERENCIA = wx.NewIdRef()
+ID_ATAJO_ALTERNAR_ESCUCHA = wx.NewIdRef()
+
 
 # ANCLAJE_INICIO: ventana_principal
 class VentanaPrincipal(wx.Frame):
     """Ventana raíz del afinador. Controles nativos wx, accesibles por defecto."""
 
     def __init__(self):
-        super().__init__(None, title="Afinador Accesible", size=(480, 400))
+        super().__init__(None, title="Afinador Accesible", size=(480, 480))
 
+        self.ajustes = cargar_ajustes()
         self.anunciador = AnunciadorNVDA()
         self.capturador = None
         self.generador_tonos = GeneradorTonos(tasa_muestreo=44100)
         self._confirmacion_pendiente = True
 
         self._construir_controles()
+        self._construir_atajos()
         self._cargar_dispositivos()
-        self._al_cambiar_instrumento(None)
+        self._aplicar_ajustes_guardados()
 
         self.Bind(wx.EVT_CLOSE, self._al_cerrar)
         self.Centre()
@@ -74,6 +94,16 @@ class VentanaPrincipal(wx.Frame):
         self.selector_dispositivo = wx.Choice(panel)
         self.selector_dispositivo.Bind(wx.EVT_CHOICE, self._al_cambiar_dispositivo)
 
+        etiqueta_tasa = wx.StaticText(panel, label="Tasa de muestreo:")
+        self.selector_tasa = wx.Choice(panel, choices=[etiqueta for etiqueta, _ in OPCIONES_TASA_MUESTREO])
+        self.selector_tasa.SetSelection(0)
+        self.selector_tasa.Bind(wx.EVT_CHOICE, self._al_cambiar_calidad_captura)
+
+        etiqueta_buffer = wx.StaticText(panel, label="Tamaño de búfer:")
+        self.selector_buffer = wx.Choice(panel, choices=[etiqueta for etiqueta, _ in OPCIONES_DURACION_VENTANA])
+        self.selector_buffer.SetSelection(1)
+        self.selector_buffer.Bind(wx.EVT_CHOICE, self._al_cambiar_calidad_captura)
+
         etiqueta_instrumento = wx.StaticText(panel, label="Instrumento:")
         self.selector_instrumento = wx.Choice(panel, choices=list(PRESETS_INSTRUMENTO.keys()))
         self.selector_instrumento.SetSelection(0)
@@ -86,14 +116,16 @@ class VentanaPrincipal(wx.Frame):
         self.etiqueta_nota = wx.StaticText(panel, label="Nota detectada: —")
         self.etiqueta_instruccion = wx.StaticText(panel, label="Instrucción: —")
 
-        self.boton_escucha = wx.Button(panel, label="Iniciar escucha")
+        self.boton_escucha = wx.Button(panel, label="Iniciar escucha (Ctrl+E)")
         self.boton_escucha.Bind(wx.EVT_BUTTON, self._al_alternar_escucha)
 
-        self.boton_referencia = wx.Button(panel, label="Reproducir tono de referencia")
+        self.boton_referencia = wx.Button(panel, label="Reproducir tono de referencia (Ctrl+P)")
         self.boton_referencia.Bind(wx.EVT_BUTTON, self._al_reproducir_referencia)
 
         for widget in (
             etiqueta_dispositivo, self.selector_dispositivo,
+            etiqueta_tasa, self.selector_tasa,
+            etiqueta_buffer, self.selector_buffer,
             etiqueta_instrumento, self.selector_instrumento,
             etiqueta_cuerda, self.selector_cuerda,
             self.etiqueta_nota, self.etiqueta_instruccion,
@@ -103,6 +135,16 @@ class VentanaPrincipal(wx.Frame):
 
         panel.SetSizer(distribucion)
 
+    def _construir_atajos(self):
+        """Ctrl+P reproduce el tono de referencia y Ctrl+E alterna la escucha, nunca Espacio."""
+        self.Bind(wx.EVT_MENU, self._al_reproducir_referencia, id=ID_ATAJO_REPRODUCIR_REFERENCIA)
+        self.Bind(wx.EVT_MENU, self._al_alternar_escucha, id=ID_ATAJO_ALTERNAR_ESCUCHA)
+        tabla = wx.AcceleratorTable([
+            (wx.ACCEL_CTRL, ord("P"), ID_ATAJO_REPRODUCIR_REFERENCIA),
+            (wx.ACCEL_CTRL, ord("E"), ID_ATAJO_ALTERNAR_ESCUCHA),
+        ])
+        self.SetAcceleratorTable(tabla)
+
     def _cargar_dispositivos(self):
         self.dispositivos = listar_dispositivos_entrada()
         self.selector_dispositivo.Clear()
@@ -110,6 +152,66 @@ class VentanaPrincipal(wx.Frame):
             self.selector_dispositivo.Append(dispositivo["nombre"])
         if self.dispositivos:
             self.selector_dispositivo.SetSelection(0)
+
+    def _aplicar_ajustes_guardados(self):
+        nombre_dispositivo = self.ajustes.get("nombre_dispositivo")
+        if nombre_dispositivo:
+            for posicion, dispositivo in enumerate(self.dispositivos):
+                if dispositivo["nombre"] == nombre_dispositivo:
+                    self.selector_dispositivo.SetSelection(posicion)
+                    break
+
+        tasa_guardada = self.ajustes.get("tasa_muestreo")
+        for posicion, (_, valor) in enumerate(OPCIONES_TASA_MUESTREO):
+            if valor == tasa_guardada:
+                self.selector_tasa.SetSelection(posicion)
+                break
+
+        duracion_guardada = self.ajustes.get("duracion_ventana", 0.1)
+        for posicion, (_, valor) in enumerate(OPCIONES_DURACION_VENTANA):
+            if valor == duracion_guardada:
+                self.selector_buffer.SetSelection(posicion)
+                break
+
+        nombre_instrumento = self.ajustes.get("instrumento")
+        if nombre_instrumento and nombre_instrumento in PRESETS_INSTRUMENTO:
+            self.selector_instrumento.SetStringSelection(nombre_instrumento)
+
+        self._al_cambiar_instrumento(None)
+
+        nombre_cuerda = self.ajustes.get("cuerda")
+        if nombre_cuerda:
+            posicion_cuerda = self.selector_cuerda.FindString(nombre_cuerda)
+            if posicion_cuerda != wx.NOT_FOUND:
+                self.selector_cuerda.SetSelection(posicion_cuerda)
+
+    def _guardar_ajustes_actuales(self):
+        posicion_dispositivo = self.selector_dispositivo.GetSelection()
+        nombre_dispositivo = (
+            self.dispositivos[posicion_dispositivo]["nombre"]
+            if posicion_dispositivo != wx.NOT_FOUND and self.dispositivos
+            else None
+        )
+        self.ajustes.update({
+            "nombre_dispositivo": nombre_dispositivo,
+            "instrumento": self.selector_instrumento.GetStringSelection(),
+            "cuerda": self.selector_cuerda.GetStringSelection() or None,
+            "tasa_muestreo": self._tasa_muestreo_seleccionada(),
+            "duracion_ventana": self._duracion_ventana_seleccionada(),
+        })
+        guardar_ajustes(self.ajustes)
+
+    def _tasa_muestreo_seleccionada(self):
+        posicion = self.selector_tasa.GetSelection()
+        if posicion == wx.NOT_FOUND:
+            return None
+        return OPCIONES_TASA_MUESTREO[posicion][1]
+
+    def _duracion_ventana_seleccionada(self):
+        posicion = self.selector_buffer.GetSelection()
+        if posicion == wx.NOT_FOUND:
+            return 0.1
+        return OPCIONES_DURACION_VENTANA[posicion][1]
 
     def _preset_actual(self):
         nombre_instrumento = self.selector_instrumento.GetStringSelection()
@@ -127,10 +229,12 @@ class VentanaPrincipal(wx.Frame):
             self.selector_cuerda.Enable()
         self.anunciador.reiniciar_estado()
         if evento is not None:
+            self._guardar_ajustes_actuales()
             evento.Skip()
 
     def _al_cambiar_cuerda(self, evento):
         self.anunciador.reiniciar_estado()
+        self._guardar_ajustes_actuales()
         evento.Skip()
 
     def _cuerda_objetivo(self):
@@ -143,6 +247,15 @@ class VentanaPrincipal(wx.Frame):
         return preset[indice]
 
     def _al_cambiar_dispositivo(self, evento):
+        self._guardar_ajustes_actuales()
+        estaba_escuchando = self.capturador is not None
+        if estaba_escuchando:
+            self._detener_escucha()
+            self._iniciar_escucha()
+        evento.Skip()
+
+    def _al_cambiar_calidad_captura(self, evento):
+        self._guardar_ajustes_actuales()
         estaba_escuchando = self.capturador is not None
         if estaba_escuchando:
             self._detener_escucha()
@@ -164,6 +277,8 @@ class VentanaPrincipal(wx.Frame):
     def _iniciar_escucha(self):
         self.capturador = CapturadorYIN(
             indice_dispositivo=self._indice_dispositivo_seleccionado(),
+            tasa_muestreo=self._tasa_muestreo_seleccionada(),
+            duracion_ventana=self._duracion_ventana_seleccionada(),
             al_detectar=self._al_detectar_tono,
         )
         try:
@@ -175,7 +290,7 @@ class VentanaPrincipal(wx.Frame):
                            "Error de audio", wx.OK | wx.ICON_ERROR)
             return
         self.generador_tonos.capturador = self.capturador
-        self.boton_escucha.SetLabel("Detener escucha")
+        self.boton_escucha.SetLabel("Detener escucha (Ctrl+E)")
         self.anunciador.reiniciar_estado()
 
     def _detener_escucha(self):
@@ -183,7 +298,7 @@ class VentanaPrincipal(wx.Frame):
             self.capturador.detener()
             self.capturador = None
             self.generador_tonos.capturador = None
-        self.boton_escucha.SetLabel("Iniciar escucha")
+        self.boton_escucha.SetLabel("Iniciar escucha (Ctrl+E)")
         self.etiqueta_nota.SetLabel("Nota detectada: —")
         self.etiqueta_instruccion.SetLabel("Instrucción: —")
 
@@ -230,6 +345,7 @@ class VentanaPrincipal(wx.Frame):
         self.generador_tonos.reproducir(frecuencia, duracion=2.0)
 
     def _al_cerrar(self, evento):
+        self._guardar_ajustes_actuales()
         self._detener_escucha()
         evento.Skip()
 # ANCLAJE_FIN: ventana_principal

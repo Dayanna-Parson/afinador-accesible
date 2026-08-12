@@ -4,3 +4,4 @@ afinador.log
 motor_rust/target/
 *.so
 *.pyd
+configuraciones/

@@ -41,6 +41,23 @@ En Windows hace falta el toolchain de Rust (`rustup`) y Visual Studio Build Tool
 python iniciar_afinador.py
 ```
 
+## Atajos de teclado
+
+- `Ctrl+P`: reproducir el tono de referencia de la cuerda/nota seleccionada.
+- `Ctrl+E`: iniciar o detener la escucha del micrófono.
+
+## Ajustes persistentes
+
+El dispositivo de entrada, la tasa de muestreo, el tamaño de búfer, el instrumento y la
+cuerda seleccionados se guardan automáticamente en `configuraciones/ajustes.json` y se
+restauran al volver a abrir la aplicación.
+
+## Pruebas
+
+```
+python -m unittest discover -s tests -v
+```
+
 ## Estructura
 
 ```
@@ -48,8 +65,11 @@ app/
 ├── motor_audio.py     # Captura de audio (dispatcher Rust/Python), algoritmo YIN de respaldo,
 │                       # generador de tonos de referencia
 ├── conector_nvda.py   # Salida de voz al lector de pantalla activo, con throttling por estabilidad
-└── interfaz_gui.py    # Ventana principal wxPython
+├── interfaz_gui.py    # Ventana principal wxPython
+├── gestor_ajustes.py  # Persistencia atómica de ajustes en configuraciones/ajustes.json
+└── config_rutas.py    # Rutas absolutas del proyecto
 motor_rust/             # Extensión nativa opcional: captura de audio (cpal) + YIN, vía PyO3
+tests/                  # Pruebas del algoritmo YIN y la lógica de notas/instrucciones
 iniciar_afinador.py     # Punto de entrada
 requisitos.txt          # Dependencias de Python
 INICIAR_AFINADOR.bat    # Lanzador para Windows

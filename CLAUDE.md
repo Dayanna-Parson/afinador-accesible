@@ -79,14 +79,20 @@ app/
 ├── motor_audio.py     # CapturadorYIN (despachador Rust/Python), _CapturadorYINPuroPython
 │                       # (respaldo), YIN en Python puro, GeneradorTonos, conversión nota↔frecuencia
 ├── conector_nvda.py    # AnunciadorNVDA: accessible_output3 + throttling por estabilidad (350 ms)
-└── interfaz_gui.py     # VentanaPrincipal: wx.Frame raíz, presets de instrumento, flujo de captura
+├── interfaz_gui.py     # VentanaPrincipal: wx.Frame raíz, presets de instrumento, flujo de captura
+├── gestor_ajustes.py    # cargar_ajustes()/guardar_ajustes(): persistencia atómica en
+│                        # configuraciones/ajustes.json
+└── config_rutas.py      # RAIZ, RUTA_CONFIGURACIONES, RUTA_AJUSTES (rutas absolutas)
 motor_rust/
 ├── Cargo.toml
 ├── pyproject.toml       # Configuración de maturin
 └── src/lib.rs           # listar_dispositivos_entrada(), CapturadorYinRust (cpal + YIN)
-iniciar_afinador.py       # Punto de entrada, configura logging a afinador.log
-requisitos.txt            # Dependencias de Python
-INICIAR_AFINADOR.bat       # Lanzador para Windows
+tests/
+└── test_motor_audio.py  # YIN contra cuerdas pulsadas sintéticas (armónicos + ruido), conversión
+│                          # de notas, cálculo de instrucción
+iniciar_afinador.py        # Punto de entrada, configura logging a afinador.log
+requisitos.txt             # Dependencias de Python
+INICIAR_AFINADOR.bat        # Lanzador para Windows
 ```
 
 ---
@@ -108,8 +114,17 @@ Si se añade un instrumento nuevo, verificar su afinación estándar real (no as
 
 ## Reglas críticas de arquitectura
 
-### Rutas
-El proyecto es pequeño y todavía no tiene un módulo `config_rutas.py` centralizado. `iniciar_afinador.py` resuelve la ruta del log con `os.path.dirname(os.path.abspath(__file__))`. Si el proyecto crece y aparecen más archivos de configuración persistente, adoptar un patrón equivalente a `RAIZ` con rutas absolutas, en vez de rutas relativas dispersas.
+### Rutas: siempre absolutas
+Nunca uses rutas relativas para archivos de configuración persistente. Usa siempre `RAIZ` de `config_rutas.py` como base:
+
+```python
+from app.config_rutas import RUTA_AJUSTES
+```
+
+`iniciar_afinador.py` resuelve la ruta del log de forma independiente, con `os.path.dirname(os.path.abspath(__file__))`, porque vive en la raíz del proyecto y no depende de `app/`.
+
+### Ajustes: persistencia atómica
+`app/gestor_ajustes.py` guarda `configuraciones/ajustes.json` escribiendo primero a un archivo temporal y renombrando después sobre el destino (evita corrupción si la app se cierra a medias). El dispositivo de entrada se persiste por **nombre**, nunca por índice — los índices de PortAudio/cpal pueden cambiar entre sesiones al conectar o desconectar hardware. `configuraciones/` está en `.gitignore`: es estado local del usuario, no se commitea.
 
 ### Hilos: wxPython no es thread-safe
 Toda actualización de UI ocurre en el hilo principal. La captura de audio corre siempre en hilos secundarios (nativos de Rust vía `cpal`, o `threading.Thread` en el respaldo Python), y notifica a la GUI exclusivamente a través de `wx.CallAfter`:
@@ -127,12 +142,27 @@ No actualices controles wx directamente desde el hilo de audio ni desde el callb
 ### Anuncios por voz: throttling obligatorio
 Ninguna instrucción de afinación se anuncia por voz de forma inmediata. `AnunciadorNVDA.procesar_instruccion()` exige que el mensaje lleve estable un mínimo de 350 ms y que difiera del último ya pronunciado. No llames a `AnunciadorNVDA.hablar()` directamente desde el bucle de detección de tono — pasa siempre por `procesar_instruccion()`, o la app satura la cola de voz del lector de pantalla en cuanto la señal esté un poco inestable.
 
+### Atajos de teclado: nunca la tecla Espacio
+`Ctrl+P` reproduce el tono de referencia y `Ctrl+E` alterna la escucha (`VentanaPrincipal._construir_atajos`, `app/interfaz_gui.py`), declarados en una única `wx.AcceleratorTable` a nivel de `wx.Frame`. Prohibido usar `Espacio` como atajo: es la tecla con la que NVDA activa controles con foco, y un atajo global en Espacio compite con eso. Si se añaden más atajos, mantenerlos todos en la misma tabla central del frame — no dupliques el mismo atajo en un panel hijo y en el frame a la vez, o la ambigüedad puede disparar el manejador equivocado.
+
 ### Errores: nunca silenciosos
 Prohibido `except: pass` o `except Exception: pass` sin logging. Mínimo:
 ```python
 logger.exception("contexto descriptivo del error")
 ```
 En Rust, equivalente: nunca ignorar un `Result` de error con `let _ =` en una ruta donde el fallo deba ser visible — usar como mínimo `eprintln!` (ver `err_fn` y los brazos `Err` en `motor_rust/src/lib.rs`) o propagar el error a Python con `PyResult`.
+
+---
+
+## Pruebas
+
+`tests/test_motor_audio.py` valida YIN contra señales sintéticas que simulan cuerdas pulsadas reales (fundamental + armónicos con amplitud decreciente, envolvente de decaimiento, ruido de fondo) — no senoidales puras, porque ahí es donde un YIN mal implementado sufre saltos de octava. Se ejecutan con:
+
+```
+python -m unittest discover -s tests -v
+```
+
+Si se toca `estimar_frecuencia_yin` (Python) o su equivalente en Rust (`motor_rust/src/lib.rs`), correr estas pruebas antes de dar el cambio por terminado. No añadir pruebas que dependan de hardware de audio real ni de wxPython — deben poder correr en cualquier máquina, incluida una sin pantalla ni micrófono.
 
 ---
 
@@ -144,6 +174,7 @@ Antes de dar cualquier cambio de interfaz por terminado, verificar:
 2. ¿Las casillas y controles anuncian su estado al navegar con flechas?
 3. ¿Las instrucciones de afinación se anuncian sin saturar la cola de voz (ver throttling arriba)?
 4. ¿El pitido de confirmación ("AFINADA") suena una sola vez por acierto, no en bucle mientras la nota se mantiene afinada?
+5. ¿Los atajos nuevos evitan la tecla Espacio y están centralizados en la tabla de aceleradores del frame?
 
 Si algo de esto falla tras un cambio, es un bug crítico, no cosmético.
 
@@ -158,5 +189,7 @@ Si algo de esto falla tras un cambio, es un bug crítico, no cosmético.
 - No uses `except: pass` sin logging, ni su equivalente silencioso en Rust.
 - No asumas la afinación estándar de un instrumento nuevo sin verificarla.
 - No rompas la paridad de interfaz entre el backend Rust y el respaldo Python de `CapturadorYIN`.
+- No uses la tecla `Espacio` como atajo de teclado.
+- No persistas el dispositivo de audio por índice; guarda siempre su nombre.
 - No commitees binarios compilados de la extensión Rust (`.pyd`, `.so`, `target/`).
 - No incluyas ninguna referencia a conversaciones, sesiones de IA ni proceso de desarrollo en el código ni en los comentarios.

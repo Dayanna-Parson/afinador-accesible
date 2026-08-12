@@ -142,11 +142,12 @@ class _CapturadorYINPuroPython:
     nativa `motor_rust` (cpal + YIN en Rust) no está compilada para la plataforma actual.
     """
 
-    def __init__(self, indice_dispositivo=None, tasa_muestreo=44100, duracion_ventana=0.1,
+    def __init__(self, indice_dispositivo=None, tasa_muestreo=None, duracion_ventana=0.1,
                  umbral_yin=0.15, umbral_rms=0.02, al_detectar=None):
         self.indice_dispositivo = indice_dispositivo
-        self.tasa_muestreo = tasa_muestreo
-        self.tamano_ventana = max(int(tasa_muestreo * duracion_ventana), 1024)
+        self.tasa_muestreo = tasa_muestreo or self._tasa_muestreo_defecto(indice_dispositivo)
+        self.duracion_ventana = duracion_ventana
+        self.tamano_ventana = max(int(self.tasa_muestreo * duracion_ventana), 1024)
         self.umbral_yin = umbral_yin
         self.umbral_rms = umbral_rms
         self.al_detectar = al_detectar
@@ -156,6 +157,15 @@ class _CapturadorYINPuroPython:
         self._hilo_analisis = None
         self._detener = threading.Event()
         self._pausado = threading.Event()
+
+    @staticmethod
+    def _tasa_muestreo_defecto(indice_dispositivo):
+        try:
+            info = sd.query_devices(indice_dispositivo, "input")
+            return int(info["default_samplerate"])
+        except Exception:
+            logger.exception("no se pudo consultar la tasa de muestreo por defecto del dispositivo")
+            return 44100
 
     def _callback_audio(self, indata, marcos, tiempo_info, estado):
         if estado:
@@ -236,13 +246,14 @@ class CapturadorYIN:
     disponible, recurre de forma transparente a la implementación en Python puro con sounddevice.
     """
 
-    def __init__(self, indice_dispositivo=None, tasa_muestreo=44100, duracion_ventana=0.1,
+    def __init__(self, indice_dispositivo=None, tasa_muestreo=None, duracion_ventana=0.1,
                  umbral_yin=0.15, umbral_rms=0.02, al_detectar=None):
         self.al_detectar = al_detectar
         if _RUST_DISPONIBLE:
             self._backend = "rust"
             self._nucleo = _motor_rust.CapturadorYinRust(
-                self._al_detectar_rust, indice_dispositivo, umbral_yin, umbral_rms
+                self._al_detectar_rust, indice_dispositivo, umbral_yin, umbral_rms,
+                tasa_muestreo, duracion_ventana,
             )
         else:
             self._backend = "python"
