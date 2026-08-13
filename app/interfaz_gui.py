@@ -1,7 +1,9 @@
 """Ventana principal accesible del afinador cromático."""
 
 import logging
+import statistics
 import time
+from collections import deque
 
 import numpy as np
 import wx
@@ -10,6 +12,7 @@ from app.motor_audio import (
     CapturadorYIN,
     GeneradorTonos,
     calcular_instruccion,
+    frecuencia_a_nota,
     listar_dispositivos_entrada,
     nota_a_frecuencia,
 )
@@ -70,6 +73,7 @@ NIVEL_SENAL_BUENA = 0.08
 SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL = 4.0
 SEGUNDOS_ESTABLE_PARA_AVANZAR = 1.2
 SEGUNDOS_MARGEN_SILENCIO_ENTRE_NOTAS = 0.5
+TAMANO_HISTORIAL_FRECUENCIAS = 5
 
 TEXTOS_CATEGORIA_NIVEL = {
     "sin_senal": "Sin señal.",
@@ -95,6 +99,7 @@ class VentanaPrincipal(wx.Frame):
         self._ultima_categoria_nivel = None
         self._marca_tiempo_ultimo_anuncio_nivel = 0.0
         self._marca_tiempo_ultima_nota = 0.0
+        self._historial_frecuencias = deque(maxlen=TAMANO_HISTORIAL_FRECUENCIAS)
 
         self._construir_controles()
         self._construir_atajos()
@@ -347,6 +352,7 @@ class VentanaPrincipal(wx.Frame):
         self._ultima_categoria_nivel = None
         self._marca_tiempo_ultimo_anuncio_nivel = 0.0
         self._marca_tiempo_ultima_nota = 0.0
+        self._historial_frecuencias.clear()
         self._temporizador_diagnostico = wx.CallLater(
             int(SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL * 1000), self._comprobar_senal_de_audio
         )
@@ -416,15 +422,24 @@ class VentanaPrincipal(wx.Frame):
             # Solo se reinicia si el silencio real se sostiene más de ese margen.
             if ahora - getattr(self, "_marca_tiempo_ultima_nota", 0.0) > SEGUNDOS_MARGEN_SILENCIO_ENTRE_NOTAS:
                 self.anunciador.reiniciar_estado()
+                self._historial_frecuencias.clear()
             return
 
         self._marca_tiempo_ultima_nota = ahora
+
+        # Filtro de mediana: en el instante del ataque de una cuerda pulsada, antes de que
+        # el sonido se asiente en su frecuencia real, YIN puede devolver lecturas puntuales
+        # erráticas (saltos de octava o notas vecinas). Quedarse con la mediana de las
+        # últimas lecturas descarta esos valores sueltos sin perder capacidad de respuesta.
+        self._historial_frecuencias.append(resultado["frecuencia"])
+        frecuencia_filtrada = statistics.median(self._historial_frecuencias)
+        resultado = frecuencia_a_nota(frecuencia_filtrada)
 
         cuerda_objetivo = self._cuerda_objetivo()
         if cuerda_objetivo is not None:
             _, indice_nota_objetivo, octava_objetivo = cuerda_objetivo
             frecuencia_objetivo = nota_a_frecuencia(indice_nota_objetivo, octava_objetivo)
-            cents = 1200 * np.log2(resultado["frecuencia"] / frecuencia_objetivo)
+            cents = 1200 * np.log2(frecuencia_filtrada / frecuencia_objetivo)
         else:
             cents = resultado["cents"]
 
