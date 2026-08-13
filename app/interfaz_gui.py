@@ -148,6 +148,9 @@ class VentanaPrincipal(wx.Frame):
             panel, min=1.0, max=5.0, initial=1.0, inc=0.5
         )
         self.control_ganancia.SetDigits(1)
+        # SpinCtrlDouble no toma el nombre accesible del StaticText contiguo: hay que
+        # ponérselo explícitamente o NVDA lo anuncia como "edición" sin ninguna etiqueta.
+        self.control_ganancia.SetLabel("Ganancia de entrada")
         self.control_ganancia.Bind(wx.EVT_SPINCTRLDOUBLE, self._al_cambiar_calidad_captura)
 
         etiqueta_sensibilidad = wx.StaticText(panel, label="Sensibilidad de detección (más alto = más permisivo):")
@@ -155,6 +158,7 @@ class VentanaPrincipal(wx.Frame):
             panel, min=0.05, max=0.40, initial=0.15, inc=0.05
         )
         self.control_sensibilidad.SetDigits(2)
+        self.control_sensibilidad.SetLabel("Sensibilidad de detección")
         self.control_sensibilidad.Bind(wx.EVT_SPINCTRLDOUBLE, self._al_cambiar_calidad_captura)
 
         self.etiqueta_nota = wx.StaticText(panel, label="Nota detectada: —")
