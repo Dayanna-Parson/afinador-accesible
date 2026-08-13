@@ -387,6 +387,7 @@ class GeneradorTonos:
         self.capturador = capturador
         self.tasa_muestreo = tasa_muestreo
         self._hilo_reproduccion = None
+        self._detener_bucle = threading.Event()
 
     @staticmethod
     def _compensar_percepcion_grave(frecuencia, amplitud):
@@ -398,11 +399,20 @@ class GeneradorTonos:
         factor = 1.0 + (200.0 - frecuencia) / 200.0
         return min(amplitud * factor, 0.95)
 
+    # Amplitud relativa de cada armónico sobre la fundamental, para que el tono de
+    # referencia suene a cuerda pulsada en vez de a pitido electrónico plano.
+    AMPLITUDES_ARMONICOS = (1.0, 0.35, 0.18, 0.09)
+
     def _generar_onda(self, frecuencia, duracion, amplitud=0.3):
         muestras = int(self.tasa_muestreo * duracion)
         tiempo = np.linspace(0, duracion, muestras, endpoint=False)
         amplitud_efectiva = self._compensar_percepcion_grave(frecuencia, amplitud)
-        onda = amplitud_efectiva * np.sin(2 * np.pi * frecuencia * tiempo)
+
+        onda = np.zeros(muestras)
+        for indice_armonico, amplitud_relativa in enumerate(self.AMPLITUDES_ARMONICOS, start=1):
+            onda += amplitud_relativa * np.sin(2 * np.pi * frecuencia * indice_armonico * tiempo)
+        onda *= amplitud_efectiva / sum(self.AMPLITUDES_ARMONICOS)
+
         rampa = min(int(self.tasa_muestreo * 0.01), muestras // 2)
         if rampa > 0:
             envolvente = np.ones(muestras)
@@ -427,12 +437,45 @@ class GeneradorTonos:
 
     def reproducir(self, frecuencia, duracion=2.0, amplitud=0.45, al_finalizar=None):
         """Reproduce el tono en un hilo secundario, pausando la captura mientras suena."""
+        self._detener_bucle.set()
         self._hilo_reproduccion = threading.Thread(
             target=self._reproducir_bloqueante,
             args=(frecuencia, duracion, amplitud, al_finalizar),
             daemon=True,
         )
         self._hilo_reproduccion.start()
+
+    def _reproducir_en_bucle(self, frecuencia, duracion, pausa, amplitud):
+        if self.capturador is not None:
+            self.capturador.pausar()
+        try:
+            onda = self._generar_onda(frecuencia, duracion, amplitud)
+            while not self._detener_bucle.is_set():
+                sd.play(onda, samplerate=self.tasa_muestreo, blocking=True)
+                if self._detener_bucle.wait(timeout=pausa):
+                    break
+        except Exception:
+            logger.exception("fallo al reproducir el tono de referencia en bucle")
+        finally:
+            sd.stop()
+            if self.capturador is not None:
+                self.capturador.reanudar()
+
+    def reproducir_en_bucle(self, frecuencia, duracion=1.2, pausa=0.4, amplitud=0.45):
+        """Repite el tono de referencia indefinidamente hasta llamar a detener_bucle()."""
+        self._detener_bucle.clear()
+        self._hilo_reproduccion = threading.Thread(
+            target=self._reproducir_en_bucle,
+            args=(frecuencia, duracion, pausa, amplitud),
+            daemon=True,
+        )
+        self._hilo_reproduccion.start()
+
+    def detener_bucle(self):
+        self._detener_bucle.set()
+        sd.stop()
+        if self.capturador is not None:
+            self.capturador.reanudar()
 
     def reproducir_confirmacion(self, frecuencia=880.0, duracion=0.15, amplitud=0.25):
         """Pitido corto de confirmación al alcanzar la afinación correcta."""

@@ -94,6 +94,7 @@ class VentanaPrincipal(wx.Frame):
         self._senal_confirmada_una_vez = False
         self._marca_tiempo_ultima_nota = 0.0
         self._historial_frecuencias = deque(maxlen=TAMANO_HISTORIAL_FRECUENCIAS)
+        self._reproduciendo_en_bucle = False
 
         self._construir_controles()
         self._construir_atajos()
@@ -131,6 +132,10 @@ class VentanaPrincipal(wx.Frame):
         self.selector_cuerda = wx.Choice(panel)
         self.selector_cuerda.Bind(wx.EVT_CHOICE, self._al_cambiar_cuerda)
 
+        self.casilla_avance_automatico = wx.CheckBox(panel, label="Avanzar automáticamente a la siguiente cuerda al afinar")
+        self.casilla_avance_automatico.SetValue(True)
+        self.casilla_avance_automatico.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
+
         self.casilla_exclusivo_wasapi = wx.CheckBox(
             panel, label="Modo exclusivo WASAPI (solo micrófonos dedicados; puede fallar con "
                          "dispositivos compuestos como \"Varios micrófonos\")"
@@ -155,16 +160,21 @@ class VentanaPrincipal(wx.Frame):
         self.boton_referencia = wx.Button(panel, label="Reproducir tono de referencia (Ctrl+P)")
         self.boton_referencia.Bind(wx.EVT_BUTTON, self._al_reproducir_referencia)
 
+        self.casilla_bucle_referencia = wx.CheckBox(panel, label="Repetir el tono de referencia en bucle")
+        self.casilla_bucle_referencia.SetValue(False)
+        self.casilla_bucle_referencia.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_bucle)
+
         for widget in (
             etiqueta_dispositivo, self.selector_dispositivo,
             etiqueta_tasa, self.selector_tasa,
             etiqueta_buffer, self.selector_buffer,
             etiqueta_instrumento, self.selector_instrumento,
             etiqueta_cuerda, self.selector_cuerda,
+            self.casilla_avance_automatico,
             self.casilla_exclusivo_wasapi,
             etiqueta_ganancia, self.control_ganancia,
             self.etiqueta_nota, self.etiqueta_instruccion, self.etiqueta_nivel,
-            self.boton_escucha, self.boton_referencia,
+            self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia,
         ):
             distribucion.Add(widget, 0, wx.ALL | wx.EXPAND, 8)
 
@@ -210,6 +220,8 @@ class VentanaPrincipal(wx.Frame):
 
         self.casilla_exclusivo_wasapi.SetValue(bool(self.ajustes.get("preferir_exclusivo_wasapi", False)))
         self.control_ganancia.SetValue(float(self.ajustes.get("ganancia", 1.0)))
+        self.casilla_bucle_referencia.SetValue(bool(self.ajustes.get("bucle_referencia", False)))
+        self.casilla_avance_automatico.SetValue(bool(self.ajustes.get("avance_automatico", True)))
 
         nombre_instrumento = self.ajustes.get("instrumento")
         if nombre_instrumento and nombre_instrumento in PRESETS_INSTRUMENTO:
@@ -238,6 +250,8 @@ class VentanaPrincipal(wx.Frame):
             "duracion_ventana": self._duracion_ventana_seleccionada(),
             "preferir_exclusivo_wasapi": self.casilla_exclusivo_wasapi.GetValue(),
             "ganancia": self.control_ganancia.GetValue(),
+            "bucle_referencia": self.casilla_bucle_referencia.GetValue(),
+            "avance_automatico": self.casilla_avance_automatico.GetValue(),
         })
         guardar_ajustes(self.ajustes)
 
@@ -482,7 +496,8 @@ class VentanaPrincipal(wx.Frame):
             self._confirmacion_pendiente = False
             self.generador_tonos.reproducir_confirmacion()
 
-        if instruccion == "AFINADA" and cuerda_objetivo is not None and not self._avance_ya_realizado:
+        if (instruccion == "AFINADA" and cuerda_objetivo is not None and not self._avance_ya_realizado
+                and self.casilla_avance_automatico.GetValue()):
             if self._afinada_desde is None:
                 self._afinada_desde = time.monotonic()
             elif time.monotonic() - self._afinada_desde >= SEGUNDOS_ESTABLE_PARA_AVANZAR:
@@ -506,15 +521,40 @@ class VentanaPrincipal(wx.Frame):
         self.anunciador.hablar("Siguiente: {}".format(self.selector_cuerda.GetStringSelection()))
 
     def _al_reproducir_referencia(self, evento):
+        if self._reproduciendo_en_bucle:
+            self.generador_tonos.detener_bucle()
+            self._reproduciendo_en_bucle = False
+            self.boton_referencia.SetLabel("Reproducir tono de referencia (Ctrl+P)")
+            return
+
         cuerda_objetivo = self._cuerda_objetivo()
         if cuerda_objetivo is not None:
             _, indice_nota, octava = cuerda_objetivo
             frecuencia = nota_a_frecuencia(indice_nota, octava)
         else:
             frecuencia = nota_a_frecuencia(9, 4)  # La4, referencia estándar en modo cromático
-        self.generador_tonos.reproducir(frecuencia, duracion=2.0)
+
+        if self.casilla_bucle_referencia.GetValue():
+            self._reproduciendo_en_bucle = True
+            self.boton_referencia.SetLabel("Detener tono de referencia (Ctrl+P)")
+            self.generador_tonos.reproducir_en_bucle(frecuencia)
+        else:
+            self.generador_tonos.reproducir(frecuencia, duracion=2.0)
+
+    def _al_cambiar_ajuste_bucle(self, evento):
+        if not self.casilla_bucle_referencia.GetValue() and self._reproduciendo_en_bucle:
+            self.generador_tonos.detener_bucle()
+            self._reproduciendo_en_bucle = False
+            self.boton_referencia.SetLabel("Reproducir tono de referencia (Ctrl+P)")
+        self._guardar_ajustes_actuales()
+        evento.Skip()
+
+    def _al_cambiar_ajuste_simple(self, evento):
+        self._guardar_ajustes_actuales()
+        evento.Skip()
 
     def _al_cerrar(self, evento):
+        self.generador_tonos.detener_bucle()
         self._guardar_ajustes_actuales()
         self._detener_escucha()
         evento.Skip()

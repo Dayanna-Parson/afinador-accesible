@@ -18,6 +18,8 @@ AJUSTES_POR_DEFECTO = {
     "umbral_rms": 0.02,
     "preferir_exclusivo_wasapi": False,
     "ganancia": 1.0,
+    "bucle_referencia": False,
+    "avance_automatico": True,
 }
 
 

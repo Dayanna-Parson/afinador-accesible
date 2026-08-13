@@ -7,6 +7,14 @@ Afinador cromático de escritorio para Windows, accesible por diseño para perso
 - Python 3.12+
 - Windows (para la integración con lectores de pantalla vía `accessible_output3`)
 
+### Ajuste imprescindible en portátiles con reducción de ruido por IA
+
+Si el portátil tiene una función de "Cancelación de ruido del micrófono" (Lenovo Vantage,
+Dolby, o similar), **desactívala** para usar el afinador. Estas funciones están entrenadas
+para reconocer voz humana y suelen filtrar o atenuar fuertemente el sonido de instrumentos
+acústicos, tratándolo como "ruido de fondo". En Lenovo Vantage: Sonido → Entrada →
+Cancelación de ruido del micrófono → **Desactivado** (en vez de "Normal" o "Varias voces").
+
 ## Instalación
 
 ```
