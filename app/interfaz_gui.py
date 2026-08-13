@@ -377,6 +377,9 @@ class VentanaPrincipal(wx.Frame):
         )
         self.generador_tonos.capturador = self.capturador
         self.boton_escucha.SetLabel("Detener escucha (Ctrl+E)")
+        # El botón cambia de etiqueta con SetLabel(), que no dispara ningún evento de
+        # accesibilidad sin foco (el atajo Ctrl+E no se lo da) — hay que anunciarlo aparte.
+        self.anunciador.hablar("Escucha iniciada.")
         self.anunciador.reiniciar_estado()
         self._nivel_maximo_observado = 0.0
         self._ultima_categoria_nivel = None
@@ -396,6 +399,7 @@ class VentanaPrincipal(wx.Frame):
             logger.info("Escucha detenida")
             self.capturador = None
             self.generador_tonos.capturador = None
+            self.anunciador.hablar("Escucha detenida.")
         self.boton_escucha.SetLabel("Iniciar escucha (Ctrl+E)")
         self.etiqueta_nota.SetLabel("Nota detectada: —")
         self.etiqueta_instruccion.SetLabel("Instrucción: —")
