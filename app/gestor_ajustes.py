@@ -20,6 +20,7 @@ AJUSTES_POR_DEFECTO = {
     "ganancia": 1.0,
     "bucle_referencia": False,
     "avance_automatico": True,
+    "umbral_yin": 0.15,
 }
 
 

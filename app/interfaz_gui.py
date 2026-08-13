@@ -150,6 +150,13 @@ class VentanaPrincipal(wx.Frame):
         self.control_ganancia.SetDigits(1)
         self.control_ganancia.Bind(wx.EVT_SPINCTRLDOUBLE, self._al_cambiar_calidad_captura)
 
+        etiqueta_sensibilidad = wx.StaticText(panel, label="Sensibilidad de detección (más alto = más permisivo):")
+        self.control_sensibilidad = wx.SpinCtrlDouble(
+            panel, min=0.05, max=0.40, initial=0.15, inc=0.05
+        )
+        self.control_sensibilidad.SetDigits(2)
+        self.control_sensibilidad.Bind(wx.EVT_SPINCTRLDOUBLE, self._al_cambiar_calidad_captura)
+
         self.etiqueta_nota = wx.StaticText(panel, label="Nota detectada: —")
         self.etiqueta_instruccion = wx.StaticText(panel, label="Instrucción: —")
         self.etiqueta_nivel = wx.StaticText(panel, label="Nivel de entrada: —")
@@ -173,6 +180,7 @@ class VentanaPrincipal(wx.Frame):
             self.casilla_avance_automatico,
             self.casilla_exclusivo_wasapi,
             etiqueta_ganancia, self.control_ganancia,
+            etiqueta_sensibilidad, self.control_sensibilidad,
             self.etiqueta_nota, self.etiqueta_instruccion, self.etiqueta_nivel,
             self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia,
         ):
@@ -220,6 +228,7 @@ class VentanaPrincipal(wx.Frame):
 
         self.casilla_exclusivo_wasapi.SetValue(bool(self.ajustes.get("preferir_exclusivo_wasapi", False)))
         self.control_ganancia.SetValue(float(self.ajustes.get("ganancia", 1.0)))
+        self.control_sensibilidad.SetValue(float(self.ajustes.get("umbral_yin", 0.15)))
         self.casilla_bucle_referencia.SetValue(bool(self.ajustes.get("bucle_referencia", False)))
         self.casilla_avance_automatico.SetValue(bool(self.ajustes.get("avance_automatico", True)))
 
@@ -250,6 +259,7 @@ class VentanaPrincipal(wx.Frame):
             "duracion_ventana": self._duracion_ventana_seleccionada(),
             "preferir_exclusivo_wasapi": self.casilla_exclusivo_wasapi.GetValue(),
             "ganancia": self.control_ganancia.GetValue(),
+            "umbral_yin": self.control_sensibilidad.GetValue(),
             "bucle_referencia": self.casilla_bucle_referencia.GetValue(),
             "avance_automatico": self.casilla_avance_automatico.GetValue(),
         })
@@ -350,6 +360,7 @@ class VentanaPrincipal(wx.Frame):
             al_detectar=self._al_detectar_tono,
             preferir_exclusivo_wasapi=self.casilla_exclusivo_wasapi.GetValue(),
             ganancia=self.control_ganancia.GetValue(),
+            umbral_yin=self.control_sensibilidad.GetValue(),
         )
         try:
             self.capturador.iniciar()
