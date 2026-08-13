@@ -126,6 +126,7 @@ struct CapturadorYinRust {
     umbral_rms: f32,
     tasa_muestreo_deseada: Option<u32>,
     duracion_ventana: f32,
+    ganancia: f32,
     callback: Py<PyAny>,
     pausado: Arc<AtomicBool>,
     detener_analisis: Arc<AtomicBool>,
@@ -156,7 +157,7 @@ fn resolver_config_entrada(
 #[pymethods]
 impl CapturadorYinRust {
     #[new]
-    #[pyo3(signature = (callback, indice_dispositivo=None, umbral_yin=0.15, umbral_rms=0.02, tasa_muestreo_deseada=None, duracion_ventana=DURACION_VENTANA_SEGUNDOS))]
+    #[pyo3(signature = (callback, indice_dispositivo=None, umbral_yin=0.15, umbral_rms=0.02, tasa_muestreo_deseada=None, duracion_ventana=DURACION_VENTANA_SEGUNDOS, ganancia=1.0))]
     fn nuevo(
         callback: Py<PyAny>,
         indice_dispositivo: Option<usize>,
@@ -164,6 +165,7 @@ impl CapturadorYinRust {
         umbral_rms: f32,
         tasa_muestreo_deseada: Option<u32>,
         duracion_ventana: f32,
+        ganancia: f32,
     ) -> Self {
         CapturadorYinRust {
             indice_dispositivo,
@@ -171,6 +173,7 @@ impl CapturadorYinRust {
             umbral_rms,
             tasa_muestreo_deseada,
             duracion_ventana,
+            ganancia,
             callback,
             pausado: Arc::new(AtomicBool::new(false)),
             detener_analisis: Arc::new(AtomicBool::new(false)),
@@ -209,6 +212,7 @@ impl CapturadorYinRust {
         let (tx_control, rx_control) = std::sync::mpsc::channel::<ComandoCaptura>();
         let (tx_arranque, rx_arranque) = std::sync::mpsc::channel::<Result<(), String>>();
         let pausado_audio = Arc::clone(&self.pausado);
+        let ganancia_audio = self.ganancia;
 
         let stream_config: cpal::StreamConfig = config.into();
         let err_fn = |error| eprintln!("error en el flujo de entrada de audio: {error}");
@@ -229,7 +233,7 @@ impl CapturadorYinRust {
                         // aplicaciones.
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| marco.iter().sum::<f32>() / marco.len() as f32)
+                            .map(|marco| (marco.iter().sum::<f32>() / marco.len() as f32 * ganancia_audio).clamp(-1.0, 1.0))
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
@@ -244,7 +248,10 @@ impl CapturadorYinRust {
                         }
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32)
+                            .map(|marco| {
+                                let promedio = marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32;
+                                (promedio * ganancia_audio).clamp(-1.0, 1.0)
+                            })
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
@@ -259,7 +266,10 @@ impl CapturadorYinRust {
                         }
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32)
+                            .map(|marco| {
+                                let promedio = marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32;
+                                (promedio * ganancia_audio).clamp(-1.0, 1.0)
+                            })
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
@@ -274,7 +284,10 @@ impl CapturadorYinRust {
                         }
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32)
+                            .map(|marco| {
+                                let promedio = marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32;
+                                (promedio * ganancia_audio).clamp(-1.0, 1.0)
+                            })
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
@@ -289,7 +302,10 @@ impl CapturadorYinRust {
                         }
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32)
+                            .map(|marco| {
+                                let promedio = marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32;
+                                (promedio * ganancia_audio).clamp(-1.0, 1.0)
+                            })
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },

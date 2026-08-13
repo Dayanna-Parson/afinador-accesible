@@ -17,6 +17,7 @@ AJUSTES_POR_DEFECTO = {
     "umbral_yin": 0.15,
     "umbral_rms": 0.02,
     "preferir_exclusivo_wasapi": False,
+    "ganancia": 1.0,
 }
 
 

@@ -169,7 +169,8 @@ class _CapturadorYINPuroPython:
     """
 
     def __init__(self, indice_dispositivo=None, tasa_muestreo=None, duracion_ventana=0.1,
-                 umbral_yin=0.15, umbral_rms=0.02, al_detectar=None, preferir_exclusivo_wasapi=False):
+                 umbral_yin=0.15, umbral_rms=0.02, al_detectar=None, preferir_exclusivo_wasapi=False,
+                 ganancia=1.0):
         self.indice_dispositivo = indice_dispositivo
         self.tasa_muestreo = tasa_muestreo or self._tasa_muestreo_defecto(indice_dispositivo)
         self.canales = self._canales_defecto(indice_dispositivo)
@@ -179,6 +180,7 @@ class _CapturadorYINPuroPython:
         self.umbral_rms = umbral_rms
         self.al_detectar = al_detectar
         self.preferir_exclusivo_wasapi = preferir_exclusivo_wasapi
+        self.ganancia = ganancia
 
         self._flujo = None
         self._cola = queue.Queue(maxsize=2)
@@ -214,6 +216,8 @@ class _CapturadorYINPuroPython:
         if self._pausado.is_set():
             return
         mono = indata.mean(axis=1) if indata.shape[1] > 1 else indata[:, 0]
+        if self.ganancia != 1.0:
+            mono = np.clip(mono * self.ganancia, -1.0, 1.0)
         try:
             self._cola.put_nowait(mono.copy())
         except queue.Full:
@@ -328,13 +332,14 @@ class CapturadorYIN:
     """
 
     def __init__(self, indice_dispositivo=None, tasa_muestreo=None, duracion_ventana=0.1,
-                 umbral_yin=0.15, umbral_rms=0.02, al_detectar=None, preferir_exclusivo_wasapi=False):
+                 umbral_yin=0.15, umbral_rms=0.02, al_detectar=None, preferir_exclusivo_wasapi=False,
+                 ganancia=1.0):
         self.al_detectar = al_detectar
         if _RUST_DISPONIBLE:
             self._backend = "rust"
             self._nucleo = _motor_rust.CapturadorYinRust(
                 self._al_detectar_rust, indice_dispositivo, umbral_yin, umbral_rms,
-                tasa_muestreo, duracion_ventana,
+                tasa_muestreo, duracion_ventana, ganancia,
             )
         else:
             self._backend = "python"
@@ -346,6 +351,7 @@ class CapturadorYIN:
                 umbral_rms=umbral_rms,
                 al_detectar=al_detectar,
                 preferir_exclusivo_wasapi=preferir_exclusivo_wasapi,
+                ganancia=ganancia,
             )
 
     @property
