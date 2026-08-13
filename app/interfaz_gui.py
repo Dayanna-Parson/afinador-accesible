@@ -75,12 +75,6 @@ SEGUNDOS_ESTABLE_PARA_AVANZAR = 1.2
 SEGUNDOS_MARGEN_SILENCIO_ENTRE_NOTAS = 0.5
 TAMANO_HISTORIAL_FRECUENCIAS = 5
 
-TEXTOS_CATEGORIA_NIVEL = {
-    "sin_senal": "Sin señal.",
-    "senal_debil": "Señal débil.",
-    "senal_buena": "Señal buena.",
-}
-
 
 # ANCLAJE_INICIO: ventana_principal
 class VentanaPrincipal(wx.Frame):
@@ -97,7 +91,7 @@ class VentanaPrincipal(wx.Frame):
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._ultima_categoria_nivel = None
-        self._marca_tiempo_ultimo_anuncio_nivel = 0.0
+        self._senal_confirmada_una_vez = False
         self._marca_tiempo_ultima_nota = 0.0
         self._historial_frecuencias = deque(maxlen=TAMANO_HISTORIAL_FRECUENCIAS)
 
@@ -361,7 +355,7 @@ class VentanaPrincipal(wx.Frame):
         self.anunciador.reiniciar_estado()
         self._nivel_maximo_observado = 0.0
         self._ultima_categoria_nivel = None
-        self._marca_tiempo_ultimo_anuncio_nivel = 0.0
+        self._senal_confirmada_una_vez = False
         self._marca_tiempo_ultima_nota = 0.0
         self._historial_frecuencias.clear()
         self._temporizador_diagnostico = wx.CallLater(
@@ -415,12 +409,18 @@ class VentanaPrincipal(wx.Frame):
         if registrar_log:
             self._marca_tiempo_ultimo_log_nivel = ahora
 
+        # Los avisos de nivel comparten canal de voz con las instrucciones de afinación, y la
+        # mayoría de lectores de pantalla cortan lo que se está diciendo en cuanto llega un
+        # texto nuevo. Anunciar la categoría de nivel en cada fluctuación (algo constante en
+        # una cuerda pulsada) cortaba las instrucciones de afinación a medias. Ahora solo se
+        # confirma una vez, la primera vez que se detecta señal real tras el silencio inicial;
+        # el resto del tiempo el canal de voz queda libre para "sube/baja/afinada".
         categoria_nivel = self._categoria_nivel(rms)
-        if (categoria_nivel != self._ultima_categoria_nivel
-                and ahora - getattr(self, "_marca_tiempo_ultimo_anuncio_nivel", 0.0) >= 1.0):
-            self._ultima_categoria_nivel = categoria_nivel
-            self._marca_tiempo_ultimo_anuncio_nivel = ahora
-            self.anunciador.hablar(TEXTOS_CATEGORIA_NIVEL[categoria_nivel])
+        if (self._ultima_categoria_nivel in (None, "sin_senal") and categoria_nivel != "sin_senal"
+                and not self._senal_confirmada_una_vez):
+            self._senal_confirmada_una_vez = True
+            self.anunciador.hablar("Señal detectada.")
+        self._ultima_categoria_nivel = categoria_nivel
 
         if resultado is None:
             self.etiqueta_nota.SetLabel("Nota detectada: —")
