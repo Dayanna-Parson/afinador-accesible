@@ -130,6 +130,13 @@ class VentanaPrincipal(wx.Frame):
         self.selector_cuerda = wx.Choice(panel)
         self.selector_cuerda.Bind(wx.EVT_CHOICE, self._al_cambiar_cuerda)
 
+        self.casilla_exclusivo_wasapi = wx.CheckBox(
+            panel, label="Modo exclusivo WASAPI (solo micrófonos dedicados; puede fallar con "
+                         "dispositivos compuestos como \"Varios micrófonos\")"
+        )
+        self.casilla_exclusivo_wasapi.SetValue(False)
+        self.casilla_exclusivo_wasapi.Bind(wx.EVT_CHECKBOX, self._al_cambiar_calidad_captura)
+
         self.etiqueta_nota = wx.StaticText(panel, label="Nota detectada: —")
         self.etiqueta_instruccion = wx.StaticText(panel, label="Instrucción: —")
         self.etiqueta_nivel = wx.StaticText(panel, label="Nivel de entrada: —")
@@ -146,6 +153,7 @@ class VentanaPrincipal(wx.Frame):
             etiqueta_buffer, self.selector_buffer,
             etiqueta_instrumento, self.selector_instrumento,
             etiqueta_cuerda, self.selector_cuerda,
+            self.casilla_exclusivo_wasapi,
             self.etiqueta_nota, self.etiqueta_instruccion, self.etiqueta_nivel,
             self.boton_escucha, self.boton_referencia,
         ):
@@ -191,6 +199,8 @@ class VentanaPrincipal(wx.Frame):
                 self.selector_buffer.SetSelection(posicion)
                 break
 
+        self.casilla_exclusivo_wasapi.SetValue(bool(self.ajustes.get("preferir_exclusivo_wasapi", False)))
+
         nombre_instrumento = self.ajustes.get("instrumento")
         if nombre_instrumento and nombre_instrumento in PRESETS_INSTRUMENTO:
             self.selector_instrumento.SetStringSelection(nombre_instrumento)
@@ -216,6 +226,7 @@ class VentanaPrincipal(wx.Frame):
             "cuerda": self.selector_cuerda.GetStringSelection() or None,
             "tasa_muestreo": self._tasa_muestreo_seleccionada(),
             "duracion_ventana": self._duracion_ventana_seleccionada(),
+            "preferir_exclusivo_wasapi": self.casilla_exclusivo_wasapi.GetValue(),
         })
         guardar_ajustes(self.ajustes)
 
@@ -312,6 +323,7 @@ class VentanaPrincipal(wx.Frame):
             tasa_muestreo=tasa_muestreo,
             duracion_ventana=duracion_ventana,
             al_detectar=self._al_detectar_tono,
+            preferir_exclusivo_wasapi=self.casilla_exclusivo_wasapi.GetValue(),
         )
         try:
             self.capturador.iniciar()

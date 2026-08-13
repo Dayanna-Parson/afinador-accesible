@@ -169,7 +169,7 @@ class _CapturadorYINPuroPython:
     """
 
     def __init__(self, indice_dispositivo=None, tasa_muestreo=None, duracion_ventana=0.1,
-                 umbral_yin=0.15, umbral_rms=0.02, al_detectar=None):
+                 umbral_yin=0.15, umbral_rms=0.02, al_detectar=None, preferir_exclusivo_wasapi=False):
         self.indice_dispositivo = indice_dispositivo
         self.tasa_muestreo = tasa_muestreo or self._tasa_muestreo_defecto(indice_dispositivo)
         self.canales = self._canales_defecto(indice_dispositivo)
@@ -178,6 +178,7 @@ class _CapturadorYINPuroPython:
         self.umbral_yin = umbral_yin
         self.umbral_rms = umbral_rms
         self.al_detectar = al_detectar
+        self.preferir_exclusivo_wasapi = preferir_exclusivo_wasapi
 
         self._flujo = None
         self._cola = queue.Queue(maxsize=2)
@@ -260,7 +261,7 @@ class _CapturadorYINPuroPython:
             callback=self._callback_audio,
         )
 
-        ajustes_exclusivos_wasapi = self._ajustes_exclusivos_wasapi()
+        ajustes_exclusivos_wasapi = self._ajustes_exclusivos_wasapi() if self.preferir_exclusivo_wasapi else None
         if ajustes_exclusivos_wasapi is not None:
             try:
                 self._flujo = sd.InputStream(extra_settings=ajustes_exclusivos_wasapi, **argumentos_flujo)
@@ -284,8 +285,14 @@ class _CapturadorYINPuroPython:
         (reducción de ruido, cancelación de eco, optimizaciones de voz), pensada para
         llamadas y dictado por voz, que puede atenuar o filtrar el sonido de un
         instrumento acústico. El modo exclusivo entrega el audio crudo del hardware,
-        sin ese procesamiento. Solo se intenta si el sistema tiene realmente WASAPI
-        (Windows); en cualquier otro caso se devuelve None y se usa el modo habitual."""
+        sin ese procesamiento — pero solo tiene sentido con un micrófono físico real:
+        en un dispositivo compuesto o virtual (p. ej. "Varios micrófonos" de Windows,
+        que combina varios elementos de un array mediante su propio procesamiento por
+        software) el modo exclusivo puede saltarse precisamente esa combinación y dejar
+        la captura casi muda, aunque el modo compartido funcione bien. Por eso está
+        desactivado por defecto (preferir_exclusivo_wasapi=False) y es opt-in. Solo se
+        intenta si el sistema tiene realmente WASAPI (Windows); en cualquier otro caso
+        se devuelve None y se usa el modo habitual."""
         if _indice_hostapi_wasapi() is None:
             return None
         try:
@@ -321,7 +328,7 @@ class CapturadorYIN:
     """
 
     def __init__(self, indice_dispositivo=None, tasa_muestreo=None, duracion_ventana=0.1,
-                 umbral_yin=0.15, umbral_rms=0.02, al_detectar=None):
+                 umbral_yin=0.15, umbral_rms=0.02, al_detectar=None, preferir_exclusivo_wasapi=False):
         self.al_detectar = al_detectar
         if _RUST_DISPONIBLE:
             self._backend = "rust"
@@ -338,6 +345,7 @@ class CapturadorYIN:
                 umbral_yin=umbral_yin,
                 umbral_rms=umbral_rms,
                 al_detectar=al_detectar,
+                preferir_exclusivo_wasapi=preferir_exclusivo_wasapi,
             )
 
     @property
