@@ -400,10 +400,9 @@ class VentanaPrincipal(wx.Frame):
         self.etiqueta_nivel.SetLabel("Nivel de entrada: {:.3f}".format(rms))
 
         ahora = time.monotonic()
-        if ahora - getattr(self, "_marca_tiempo_ultimo_log_nivel", 0.0) >= 1.0:
+        registrar_log = ahora - getattr(self, "_marca_tiempo_ultimo_log_nivel", 0.0) >= 1.0
+        if registrar_log:
             self._marca_tiempo_ultimo_log_nivel = ahora
-            nombre_nota = "{}{}".format(resultado["nombre"], resultado["octava"]) if resultado else "ninguna"
-            logger.info("Nivel actual: rms=%.4f nota=%s", rms, nombre_nota)
 
         categoria_nivel = self._categoria_nivel(rms)
         if (categoria_nivel != self._ultima_categoria_nivel
@@ -423,6 +422,11 @@ class VentanaPrincipal(wx.Frame):
             if ahora - getattr(self, "_marca_tiempo_ultima_nota", 0.0) > SEGUNDOS_MARGEN_SILENCIO_ENTRE_NOTAS:
                 self.anunciador.reiniciar_estado()
                 self._historial_frecuencias.clear()
+            if registrar_log:
+                logger.info(
+                    "Nivel actual: rms=%.4f nota=ninguna instrumento=%s cuerda=%s",
+                    rms, self.selector_instrumento.GetStringSelection(), self.selector_cuerda.GetStringSelection(),
+                )
             return
 
         self._marca_tiempo_ultima_nota = ahora
@@ -450,6 +454,13 @@ class VentanaPrincipal(wx.Frame):
             "Nota detectada: {}{} ({:+.0f} cents)".format(resultado["nombre"], resultado["octava"], cents)
         )
         self.etiqueta_instruccion.SetLabel("Instrucción: {}".format(texto_instruccion))
+
+        if registrar_log:
+            logger.info(
+                "Nivel actual: rms=%.4f nota=%s%s cents=%+.1f instruccion=%s instrumento=%s cuerda=%s",
+                rms, resultado["nombre"], resultado["octava"], cents, instruccion,
+                self.selector_instrumento.GetStringSelection(), self.selector_cuerda.GetStringSelection(),
+            )
 
         if instruccion != "AFINADA":
             self._confirmacion_pendiente = True
