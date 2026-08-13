@@ -69,6 +69,7 @@ NIVEL_MINIMO_SENAL_DIAGNOSTICO = 0.01
 NIVEL_SENAL_BUENA = 0.08
 SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL = 4.0
 SEGUNDOS_ESTABLE_PARA_AVANZAR = 1.2
+SEGUNDOS_MARGEN_SILENCIO_ENTRE_NOTAS = 0.5
 
 TEXTOS_CATEGORIA_NIVEL = {
     "sin_senal": "Sin señal.",
@@ -93,6 +94,7 @@ class VentanaPrincipal(wx.Frame):
         self._avance_ya_realizado = False
         self._ultima_categoria_nivel = None
         self._marca_tiempo_ultimo_anuncio_nivel = 0.0
+        self._marca_tiempo_ultima_nota = 0.0
 
         self._construir_controles()
         self._construir_atajos()
@@ -344,6 +346,7 @@ class VentanaPrincipal(wx.Frame):
         self._nivel_maximo_observado = 0.0
         self._ultima_categoria_nivel = None
         self._marca_tiempo_ultimo_anuncio_nivel = 0.0
+        self._marca_tiempo_ultima_nota = 0.0
         self._temporizador_diagnostico = wx.CallLater(
             int(SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL * 1000), self._comprobar_senal_de_audio
         )
@@ -406,8 +409,16 @@ class VentanaPrincipal(wx.Frame):
         if resultado is None:
             self.etiqueta_nota.SetLabel("Nota detectada: —")
             self.etiqueta_instruccion.SetLabel("Instrucción: —")
-            self.anunciador.reiniciar_estado()
+            # Una cuerda pulsada decae: el nivel sube y baja constantemente entre "hay nota"
+            # y "no hay nada" en fracciones de segundo, aunque la nota siga sonando. Reiniciar
+            # el estado del anunciador en cada hueco así de breve nunca deja acumular los 350 ms
+            # de estabilidad que exige el throttling, y la instrucción no llega a decirse nunca.
+            # Solo se reinicia si el silencio real se sostiene más de ese margen.
+            if ahora - getattr(self, "_marca_tiempo_ultima_nota", 0.0) > SEGUNDOS_MARGEN_SILENCIO_ENTRE_NOTAS:
+                self.anunciador.reiniciar_estado()
             return
+
+        self._marca_tiempo_ultima_nota = ahora
 
         cuerda_objetivo = self._cuerda_objetivo()
         if cuerda_objetivo is not None:
