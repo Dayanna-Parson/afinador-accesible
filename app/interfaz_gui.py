@@ -471,9 +471,12 @@ class VentanaPrincipal(wx.Frame):
         _, indice_nota, octava = cuerda_objetivo
         nota_resultante = frecuencia_a_nota(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono))
         cents_totales = cuartos_tono * CENTS_POR_CUARTO_TONO
+        # No basta con decir la nota más cercana: si el retoque cae justo a mitad de camino
+        # entre dos notas (un cuarto de tono), hace falta también los cents que le faltan a
+        # esa nota más cercana para saber si se ha llegado exactamente al cuarto de tono.
         self.anunciador.hablar(
-            "Retoque: {:+d} cents. Nota más cercana: {}{}.".format(
-                cents_totales, nota_resultante["nombre"], nota_resultante["octava"]
+            "Retoque: {:+d} cents desde la base. Ahora en {}{}, {:+.0f} cents.".format(
+                cents_totales, nota_resultante["nombre"], nota_resultante["octava"], nota_resultante["cents"]
             )
         )
 
