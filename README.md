@@ -72,10 +72,12 @@ El retoque se guarda por cuerda (y se recuerda entre sesiones) hasta que se rest
 `Ctrl+Mayús+R`. Tanto la instrucción de afinación como el tono de referencia (`Ctrl+P`)
 tienen en cuenta el retoque activo.
 
-## Escalas de maqam árabe (solo lira)
+## Escalas y afinaciones alternativas
 
-El selector "Escala" (activo solo con la lira de 16 cuerdas seleccionada) aplica de golpe
-los retoques de cuarto de tono de un maqam sobre la afinación diatónica de fábrica:
+El selector "Escala / afinación" cambia de opciones según el instrumento activo y aplica
+de golpe los retoques correspondientes sobre la afinación de fábrica.
+
+### Lira: maqam árabe (cuartos de tono)
 
 - **Maqam Rast (sobre Sol)**: la cuerda de Si baja medio tono y la de Fa sube medio tono
   (cuarto de tono cada una), en todas las octavas.
@@ -84,14 +86,26 @@ los retoques de cuarto de tono de un maqam sobre la afinación diatónica de fá
 - **Maqam Hijaz (sobre Re)**: la cuerda de Si baja un semitono, la de Mi baja un semitono
   y la de Fa sube un semitono (el característico segundo aumentado del maqam).
 
-Patrones verificados contra la teoría estándar de intervalos en cuartos de tono. Cada
-retoque aplicado por una escala se puede seguir ajustando a mano con
-`Ctrl+Mayús+Flecha arriba/abajo` si el oído dice otra cosa.
+Patrones verificados contra la teoría estándar de intervalos en cuartos de tono.
 
-En guitarra y ukelele el retoque de cuarto de tono también funciona, pero solo desplaza la
-cuerda al aire entera: los trastes siguen fijos en semitonos occidentales, así que no crea
-notas de cuarto de tono nuevas en el mástil (para eso hacen falta trastes especiales o
-técnica de bending, algo ajeno a la afinación).
+### Guitarra: afinaciones alternativas estándar
+
+Drop D, Open G, Open D y DADGAD — todas verificadas nota por nota contra sus afinaciones
+de referencia reales.
+
+### Ukelele: afinaciones alternativas estándar
+
+Sol grave (Low G, sin reentrancia, la cuerda de Sol baja una octava en vez de ser la más
+aguda) y la afinación Re tradicional (todas las cuerdas un tono entero por encima de la
+afinación estándar, común en partituras hawaianas antiguas).
+
+En instrumentos con trastes (guitarra, ukelele) estas afinaciones solo desplazan la cuerda
+al aire entera: los trastes siguen fijos en semitonos occidentales, así que no dan acceso a
+cuartos de tono nuevos en el mástil — para maqam en esos instrumentos hace falta afinar a
+una de estas disposiciones y luego doblar la cuerda (bending) por oído.
+
+Cada retoque aplicado por una escala se puede seguir ajustando a mano con
+`Ctrl+Mayús+Flecha arriba/abajo` si el oído dice otra cosa.
 
 ## Ajustes persistentes
 

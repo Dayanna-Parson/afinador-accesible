@@ -54,25 +54,52 @@ PRESETS_INSTRUMENTO = {
 }
 
 NOMBRE_LIRA = "Lira de 16 cuerdas (Aklot)"
-ESCALA_DIATONICA = "Diatónica de fábrica"
+NOMBRE_GUITARRA = "Guitarra"
+NOMBRE_UKELELE = "Ukelele"
 
-# Desplazamiento en cuartos de tono (50 cents cada uno) sobre la afinación diatónica de
-# fábrica de la lira, para cada maqam. Patrones verificados contra la teoría estándar
-# (Touma, "The Music of the Arabs"): Rast sobre Sol (4,3,3,4,4,3,3 cuartos de tono desde
-# la tónica), Bayati sobre Re (3,3,4,4,2,4,4) e Hijaz sobre Re (2,6,2,4,2,4,4). Al coincidir
-# la afinación diatónica de la lira con las notas naturales, solo hace falta retocar las
-# cuerdas cuyo grado cambia respecto al maqam; el resto se queda igual.
-ESCALAS_LIRA = {
-    ESCALA_DIATONICA: {},
-    "Maqam Rast (sobre Sol)": {
-        "Cuerda 3 (Si)": -1, "Cuerda 7 (Fa)": 1, "Cuerda 10 (Si)": -1, "Cuerda 14 (Fa)": 1,
+# Desplazamiento en cuartos de tono (50 cents cada uno) sobre la afinación de fábrica de
+# cada instrumento, por escala/afinación. Todos los valores son múltiplos de 2 (semitonos
+# completos) salvo los maqam de la lira, que usan cuartos de tono sueltos a propósito.
+#
+# Lira: patrones verificados contra la teoría estándar de intervalos en cuartos de tono
+# (Touma, "The Music of the Arabs"): Rast sobre Sol (4,3,3,4,4,3,3 cuartos de tono desde la
+# tónica), Bayati sobre Re (3,3,4,4,2,4,4) e Hijaz sobre Re (2,6,2,4,2,4,4). Al coincidir la
+# afinación diatónica de la lira con las notas naturales, solo hace falta retocar las
+# cuerdas cuyo grado cambia respecto al maqam.
+#
+# Guitarra y ukelele: afinaciones alternativas estándar, ampliamente documentadas. En un
+# instrumento con trastes el retoque solo desplaza la cuerda al aire entera — los trastes
+# siguen fijos en semitonos occidentales, así que estas afinaciones no dan acceso a cuartos
+# de tono nuevos en el mástil, solo a otras disposiciones de acordes/resonancias.
+ESCALAS_POR_INSTRUMENTO = {
+    NOMBRE_LIRA: {
+        "Diatónica de fábrica": {},
+        "Maqam Rast (sobre Sol)": {
+            "Cuerda 3 (Si)": -1, "Cuerda 7 (Fa)": 1, "Cuerda 10 (Si)": -1, "Cuerda 14 (Fa)": 1,
+        },
+        "Maqam Bayati (sobre Re)": {
+            "Cuerda 3 (Si)": -2, "Cuerda 6 (Mi)": -1, "Cuerda 10 (Si)": -2, "Cuerda 13 (Mi)": -1,
+        },
+        "Maqam Hijaz (sobre Re)": {
+            "Cuerda 3 (Si)": -2, "Cuerda 6 (Mi)": -2, "Cuerda 7 (Fa)": 2,
+            "Cuerda 10 (Si)": -2, "Cuerda 13 (Mi)": -2, "Cuerda 14 (Fa)": 2,
+        },
     },
-    "Maqam Bayati (sobre Re)": {
-        "Cuerda 3 (Si)": -2, "Cuerda 6 (Mi)": -1, "Cuerda 10 (Si)": -2, "Cuerda 13 (Mi)": -1,
+    NOMBRE_GUITARRA: {
+        "Estándar (Mi La Re Sol Si Mi)": {},
+        "Drop D (Re La Re Sol Si Mi)": {"Cuerda 6 (Mi)": -4},
+        "Open G (Re Sol Re Sol Si Re)": {"Cuerda 6 (Mi)": -4, "Cuerda 5 (La)": -4, "Cuerda 1 (Mi)": -4},
+        "Open D (Re La Re Fa# La Re)": {
+            "Cuerda 6 (Mi)": -4, "Cuerda 3 (Sol)": -2, "Cuerda 2 (Si)": -4, "Cuerda 1 (Mi)": -4,
+        },
+        "DADGAD (Re La Re Sol La Re)": {"Cuerda 6 (Mi)": -4, "Cuerda 2 (Si)": -4, "Cuerda 1 (Mi)": -4},
     },
-    "Maqam Hijaz (sobre Re)": {
-        "Cuerda 3 (Si)": -2, "Cuerda 6 (Mi)": -2, "Cuerda 7 (Fa)": 2,
-        "Cuerda 10 (Si)": -2, "Cuerda 13 (Mi)": -2, "Cuerda 14 (Fa)": 2,
+    NOMBRE_UKELELE: {
+        "Estándar (Sol Do Mi La, reentrante)": {},
+        "Sol grave (Low G, sin reentrancia)": {"Cuerda 1 (Sol)": -24},
+        "Afinación Re tradicional (La Re Fa# Si)": {
+            "Cuerda 1 (Sol)": 4, "Cuerda 2 (Do)": 4, "Cuerda 3 (Mi)": 4, "Cuerda 4 (La)": 4,
+        },
     },
 }
 
@@ -161,9 +188,8 @@ class VentanaPrincipal(wx.Frame):
         self.selector_cuerda = wx.Choice(panel)
         self.selector_cuerda.Bind(wx.EVT_CHOICE, self._al_cambiar_cuerda)
 
-        etiqueta_escala = wx.StaticText(panel, label="Escala (solo lira):")
-        self.selector_escala = wx.Choice(panel, choices=list(ESCALAS_LIRA.keys()))
-        self.selector_escala.SetSelection(0)
+        etiqueta_escala = wx.StaticText(panel, label="Escala / afinación:")
+        self.selector_escala = wx.Choice(panel)
         self.selector_escala.Bind(wx.EVT_CHOICE, self._al_cambiar_escala)
 
         self.casilla_avance_automatico = wx.CheckBox(panel, label="Avanzar automáticamente a la siguiente cuerda al afinar")
@@ -342,7 +368,18 @@ class VentanaPrincipal(wx.Frame):
                 self.selector_cuerda.Append(nombre_cuerda)
             self.selector_cuerda.SetSelection(0)
             self.selector_cuerda.Enable()
-        self.selector_escala.Enable(self.selector_instrumento.GetStringSelection() == NOMBRE_LIRA)
+
+        instrumento = self.selector_instrumento.GetStringSelection()
+        escalas_disponibles = ESCALAS_POR_INSTRUMENTO.get(instrumento)
+        self.selector_escala.Clear()
+        if escalas_disponibles:
+            for nombre_escala in escalas_disponibles:
+                self.selector_escala.Append(nombre_escala)
+            self.selector_escala.SetSelection(0)
+            self.selector_escala.Enable()
+        else:
+            self.selector_escala.Disable()
+
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
         self._avance_ya_realizado = False
@@ -353,7 +390,7 @@ class VentanaPrincipal(wx.Frame):
     def _al_cambiar_escala(self, evento):
         instrumento = self.selector_instrumento.GetStringSelection()
         nombre_escala = self.selector_escala.GetStringSelection()
-        desplazamientos = ESCALAS_LIRA.get(nombre_escala, {})
+        desplazamientos = ESCALAS_POR_INSTRUMENTO.get(instrumento, {}).get(nombre_escala, {})
         for nombre_cuerda, _, _ in PRESETS_INSTRUMENTO.get(instrumento) or []:
             clave = "{}||{}".format(instrumento, nombre_cuerda)
             if nombre_cuerda in desplazamientos:
