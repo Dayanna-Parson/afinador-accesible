@@ -112,6 +112,27 @@ Los presets viven en `PRESETS_INSTRUMENTO` (`app/interfaz_gui.py`), como listas 
 
 Si se añade un instrumento nuevo, verificar su afinación estándar real (no asumir) antes de codificar el preset — ya ha pasado que el valor por defecto asumido para la lira no coincidía con el modelo real de la usuaria (Aklot arranca en Sol3, no en Do3).
 
+### Retoque fino por cuerda (cuartos de tono) y escalas/afinaciones alternativas
+
+Cada cuerda puede desplazarse de su nota de fábrica en pasos de cuarto de tono (50 cents,
+`CENTS_POR_CUARTO_TONO` en `motor_audio.py`), guardado en `self.ajustes_finos_cuerdas`
+(`VentanaPrincipal`) con clave `"{instrumento}||{nombre_cuerda}"` y persistido en
+`ajustes.json`. `frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono)` es la
+única función que debe calcular la frecuencia real de una cuerda — tanto la instrucción de
+afinación (`_actualizar_deteccion`) como el tono de referencia (`_al_reproducir_referencia`)
+pasan siempre por `_frecuencia_objetivo_actual()`, que lee ese mismo desplazamiento. Nunca
+dupliques el cálculo de frecuencia objetivo en un sitio nuevo sin pasar por ahí, o divergirán
+entre lo que suena y lo que se compara.
+
+`ESCALAS_POR_INSTRUMENTO` (`app/interfaz_gui.py`) define, por instrumento, diccionarios de
+`nombre_cuerda → cuartos_tono` que se aplican de golpe sobre `ajustes_finos_cuerdas` al
+cambiar el selector "Escala / afinación" (`_al_cambiar_escala`): incluye los maqams árabes
+de la lira (Rast, Bayati, Hijaz, verificados contra Touma, "The Music of the Arabs") y
+afinaciones alternativas de guitarra y ukelele. Un cuarto de tono (50 cents) es una
+diferencia real pero sutil al oído en un tono aislado — no asumas que "suena igual" significa
+que el retoque no se aplicó; usa la escucha previa o la confirmación por voz de la
+referencia (ver más abajo) para verificarlo objetivamente en vez de fiarte del oído.
+
 ---
 
 ## Reglas críticas de arquitectura
@@ -147,11 +168,37 @@ El `rms` llega en todos los callbacks de detección, aunque no haya nota detecta
 ### Anuncios por voz: throttling obligatorio, y un solo canal de voz
 Ninguna instrucción de afinación se anuncia por voz de forma inmediata. `AnunciadorNVDA.procesar_instruccion()` exige que el mensaje lleve estable un mínimo de 350 ms y que difiera del último ya pronunciado. No llames a `AnunciadorNVDA.hablar()` directamente desde el bucle de detección de tono — pasa siempre por `procesar_instruccion()`, o la app satura la cola de voz del lector de pantalla en cuanto la señal esté un poco inestable. Además, cualquier otro anuncio (diagnóstico, confirmaciones) comparte el mismo canal de voz que las instrucciones de afinación, y la mayoría de lectores de pantalla cortan lo que se está diciendo en cuanto llega un texto nuevo — un anuncio secundario que se repite con frecuencia (como el nivel de entrada) puede cortar a medias la instrucción real antes de que la usuaria la oiga completa. Los anuncios que no sean la instrucción de afinación deben ser puntuales (una sola vez por evento), nunca una narración continua.
 
+Por la misma razón, `_al_reproducir_referencia` anuncia con `hablar()` (evento puntual, no
+`procesar_instruccion()`) si el tono que va a sonar lleva retoque aplicado y cuántos cents,
+antes de reproducirlo — un cuarto de tono es una diferencia real pero difícil de distinguir
+de oído en una nota aislada, así que la app confirma por voz en vez de dejar que la usuaria
+dude de si el retoque se aplicó de verdad.
+
 ### Micrófonos con cancelación de ruido por IA
 Los portátiles con reducción de ruido inteligente en el micrófono (Lenovo Vantage y similares) están entrenados para reconocer voz humana y suelen filtrar el sonido de instrumentos acústicos como si fuera ruido de fondo. Documentado en el README: hay que desactivar esa función para poder usar el afinador con el micrófono integrado.
 
 ### Atajos de teclado: nunca la tecla Espacio
-`Ctrl+P` reproduce el tono de referencia y `Ctrl+E` alterna la escucha (`VentanaPrincipal._construir_atajos`, `app/interfaz_gui.py`), declarados en una única `wx.AcceleratorTable` a nivel de `wx.Frame`. Prohibido usar `Espacio` como atajo: es la tecla con la que NVDA activa controles con foco, y un atajo global en Espacio compite con eso. Si se añaden más atajos, mantenerlos todos en la misma tabla central del frame — no dupliques el mismo atajo en un panel hijo y en el frame a la vez, o la ambigüedad puede disparar el manejador equivocado.
+Todos declarados en una única `wx.AcceleratorTable` a nivel de `wx.Frame`
+(`VentanaPrincipal._construir_atajos`, `app/interfaz_gui.py`):
+
+| Atajo | Acción |
+|---|---|
+| `Ctrl+P` | Reproducir el tono de referencia de la cuerda/nota seleccionada |
+| `Ctrl+E` | Iniciar/detener la escucha del micrófono |
+| `Ctrl+Mayús+Flecha arriba/abajo` | Retocar la cuerda seleccionada en cuartos de tono |
+| `Ctrl+Mayús+R` | Restablecer el retoque de la cuerda seleccionada |
+| `Ctrl+Mayús+Z` | Deshacer el último retoque en cuartos de tono (cualquier cuerda, vía `self._historial_retoques`) |
+| `Ctrl+Mayús+P` | Escucha previa de toda la escala/afinación activa (`GeneradorTonos.reproducir_secuencia`) |
+
+Prohibido usar `Espacio` como atajo: es la tecla con la que NVDA activa controles con foco, y un atajo global en Espacio compite con eso. Si se añaden más atajos, mantenerlos todos en la misma tabla central del frame — no dupliques el mismo atajo en un panel hijo y en el frame a la vez, o la ambigüedad puede disparar el manejador equivocado.
+
+### Modo solo escucha
+La casilla `casilla_modo_solo_escucha` (persistida como `modo_solo_escucha` en `ajustes.json`)
+hace que `_actualizar_deteccion` anuncie solo la nota detectada (p. ej. "Sol3"), sin calcular
+ni pronunciar instrucción de sube/baja ni disparar la confirmación/avance automático — para
+identificar por oído lo que suena en vez de afinar hacia un objetivo. Si se toca esa función,
+mantener el `return` temprano que evita ejecutar el resto de la lógica de afinación con la
+casilla activa, o volverán a sonar instrucciones que el modo promete no dar.
 
 ### Errores: nunca silenciosos
 Prohibido `except: pass` o `except Exception: pass` sin logging. Mínimo:
