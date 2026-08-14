@@ -798,8 +798,18 @@ class VentanaPrincipal(wx.Frame):
             return
 
         frecuencia = self._frecuencia_objetivo_actual()
+        cuartos_tono = self._cuartos_tono_actual()
         if frecuencia is None:
             frecuencia = nota_a_frecuencia(9, 4)  # La4, referencia estándar en modo cromático
+            self.anunciador.hablar("Referencia: La4 (440 Hz), modo cromático.")
+        elif cuartos_tono != 0:
+            self.anunciador.hablar(
+                "Referencia con retoque: {:+d} cents sobre la nota de fábrica de esta cuerda.".format(
+                    cuartos_tono * CENTS_POR_CUARTO_TONO
+                )
+            )
+        else:
+            self.anunciador.hablar("Referencia: nota de fábrica de esta cuerda, sin retoque.")
 
         if self.casilla_bucle_referencia.GetValue():
             self._reproduciendo_en_bucle = True
