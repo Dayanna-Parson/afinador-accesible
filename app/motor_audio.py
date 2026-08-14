@@ -96,6 +96,20 @@ def nota_a_frecuencia(indice_nota, octava):
     return FRECUENCIA_LA4 * (2 ** (semitonos_desde_la4 / 12))
 
 
+CENTS_POR_CUARTO_TONO = 50
+
+
+def frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono=0):
+    """Frecuencia de una nota cromática desplazada en cuartos de tono (50 cents cada uno).
+
+    Permite afinar cuerdas a sostenidos/bemoles fuera de la escala diatónica de fábrica
+    (con desplazamientos de 2 cuartos de tono = 1 semitono) o a los cuartos de tono
+    intermedios que usa la música árabe (maqam), con un solo cuarto de tono.
+    """
+    frecuencia_base = nota_a_frecuencia(indice_nota, octava)
+    return frecuencia_base * (2 ** (cuartos_tono * CENTS_POR_CUARTO_TONO / 1200))
+
+
 def calcular_instruccion(cents, margen_afinada=5.0, margen_bastante=25.0):
     """Clasifica la desviación en cents en una instrucción de afinación."""
     if cents is None:

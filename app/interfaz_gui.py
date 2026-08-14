@@ -10,9 +10,11 @@ import wx
 
 from app.motor_audio import (
     CapturadorYIN,
+    CENTS_POR_CUARTO_TONO,
     GeneradorTonos,
     calcular_instruccion,
     frecuencia_a_nota,
+    frecuencia_con_desplazamiento,
     listar_dispositivos_entrada,
     nota_a_frecuencia,
 )
@@ -67,6 +69,9 @@ OPCIONES_DURACION_VENTANA = [
 
 ID_ATAJO_REPRODUCIR_REFERENCIA = wx.NewIdRef()
 ID_ATAJO_ALTERNAR_ESCUCHA = wx.NewIdRef()
+ID_ATAJO_SUBIR_CUARTO_TONO = wx.NewIdRef()
+ID_ATAJO_BAJAR_CUARTO_TONO = wx.NewIdRef()
+ID_ATAJO_RESTABLECER_AJUSTE_FINO = wx.NewIdRef()
 
 NIVEL_MINIMO_SENAL_DIAGNOSTICO = 0.01
 NIVEL_SENAL_BUENA = 0.08
@@ -84,6 +89,7 @@ class VentanaPrincipal(wx.Frame):
         super().__init__(None, title="Afinador Accesible", size=(480, 480))
 
         self.ajustes = cargar_ajustes()
+        self.ajustes_finos_cuerdas = dict(self.ajustes.get("ajustes_finos_cuerdas", {}))
         self.anunciador = AnunciadorNVDA()
         self.capturador = None
         self.generador_tonos = GeneradorTonos(tasa_muestreo=44100)
@@ -193,12 +199,20 @@ class VentanaPrincipal(wx.Frame):
         panel.SetSizer(distribucion)
 
     def _construir_atajos(self):
-        """Ctrl+P reproduce el tono de referencia y Ctrl+E alterna la escucha, nunca Espacio."""
+        """Ctrl+P reproduce el tono de referencia, Ctrl+E alterna la escucha, Ctrl+Mayús+Flecha
+        arriba/abajo retoca la cuerda seleccionada en cuartos de tono, y Ctrl+Mayús+R restablece
+        ese retoque. Nunca se usa la tecla Espacio."""
         self.Bind(wx.EVT_MENU, self._al_reproducir_referencia, id=ID_ATAJO_REPRODUCIR_REFERENCIA)
         self.Bind(wx.EVT_MENU, self._al_alternar_escucha, id=ID_ATAJO_ALTERNAR_ESCUCHA)
+        self.Bind(wx.EVT_MENU, self._al_subir_cuarto_tono, id=ID_ATAJO_SUBIR_CUARTO_TONO)
+        self.Bind(wx.EVT_MENU, self._al_bajar_cuarto_tono, id=ID_ATAJO_BAJAR_CUARTO_TONO)
+        self.Bind(wx.EVT_MENU, self._al_restablecer_ajuste_fino, id=ID_ATAJO_RESTABLECER_AJUSTE_FINO)
         tabla = wx.AcceleratorTable([
             (wx.ACCEL_CTRL, ord("P"), ID_ATAJO_REPRODUCIR_REFERENCIA),
             (wx.ACCEL_CTRL, ord("E"), ID_ATAJO_ALTERNAR_ESCUCHA),
+            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, wx.WXK_UP, ID_ATAJO_SUBIR_CUARTO_TONO),
+            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, wx.WXK_DOWN, ID_ATAJO_BAJAR_CUARTO_TONO),
+            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("R"), ID_ATAJO_RESTABLECER_AJUSTE_FINO),
         ])
         self.SetAcceleratorTable(tabla)
 
@@ -266,6 +280,7 @@ class VentanaPrincipal(wx.Frame):
             "umbral_yin": self.control_sensibilidad.GetValue(),
             "bucle_referencia": self.casilla_bucle_referencia.GetValue(),
             "avance_automatico": self.casilla_avance_automatico.GetValue(),
+            "ajustes_finos_cuerdas": self.ajustes_finos_cuerdas,
         })
         guardar_ajustes(self.ajustes)
 
@@ -317,6 +332,61 @@ class VentanaPrincipal(wx.Frame):
         if indice == wx.NOT_FOUND:
             return None
         return preset[indice]
+
+    def _clave_ajuste_fino(self):
+        nombre_cuerda = self.selector_cuerda.GetStringSelection()
+        if not nombre_cuerda:
+            return None
+        return "{}||{}".format(self.selector_instrumento.GetStringSelection(), nombre_cuerda)
+
+    def _cuartos_tono_actual(self):
+        clave = self._clave_ajuste_fino()
+        if clave is None:
+            return 0
+        return self.ajustes_finos_cuerdas.get(clave, 0)
+
+    def _frecuencia_objetivo_actual(self):
+        """Frecuencia real de la cuerda seleccionada, incluyendo el retoque fino en cuartos
+        de tono si lo hay. None en modo Cromático (sin cuerda objetivo)."""
+        cuerda_objetivo = self._cuerda_objetivo()
+        if cuerda_objetivo is None:
+            return None
+        _, indice_nota, octava = cuerda_objetivo
+        return frecuencia_con_desplazamiento(indice_nota, octava, self._cuartos_tono_actual())
+
+    def _desplazar_cuarto_tono(self, delta):
+        clave = self._clave_ajuste_fino()
+        if clave is None:
+            self.anunciador.hablar("No hay ninguna cuerda seleccionada para retocar.")
+            return
+        cuartos_tono = self.ajustes_finos_cuerdas.get(clave, 0) + delta
+        self.ajustes_finos_cuerdas[clave] = cuartos_tono
+        self._guardar_ajustes_actuales()
+        self.anunciador.reiniciar_estado()
+        self._afinada_desde = None
+        self._avance_ya_realizado = False
+        self._historial_frecuencias.clear()
+        cents_totales = cuartos_tono * CENTS_POR_CUARTO_TONO
+        self.anunciador.hablar("Retoque: {:+d} cents.".format(cents_totales))
+
+    def _al_subir_cuarto_tono(self, evento):
+        self._desplazar_cuarto_tono(1)
+
+    def _al_bajar_cuarto_tono(self, evento):
+        self._desplazar_cuarto_tono(-1)
+
+    def _al_restablecer_ajuste_fino(self, evento):
+        clave = self._clave_ajuste_fino()
+        if clave is None or clave not in self.ajustes_finos_cuerdas:
+            self.anunciador.hablar("Esta cuerda no tiene ningún retoque que restablecer.")
+            return
+        del self.ajustes_finos_cuerdas[clave]
+        self._guardar_ajustes_actuales()
+        self.anunciador.reiniciar_estado()
+        self._afinada_desde = None
+        self._avance_ya_realizado = False
+        self._historial_frecuencias.clear()
+        self.anunciador.hablar("Retoque restablecido.")
 
     def _al_cambiar_dispositivo(self, evento):
         self._guardar_ajustes_actuales()
@@ -484,9 +554,8 @@ class VentanaPrincipal(wx.Frame):
         resultado = frecuencia_a_nota(frecuencia_filtrada)
 
         cuerda_objetivo = self._cuerda_objetivo()
-        if cuerda_objetivo is not None:
-            _, indice_nota_objetivo, octava_objetivo = cuerda_objetivo
-            frecuencia_objetivo = nota_a_frecuencia(indice_nota_objetivo, octava_objetivo)
+        frecuencia_objetivo = self._frecuencia_objetivo_actual()
+        if frecuencia_objetivo is not None:
             cents = 1200 * np.log2(frecuencia_filtrada / frecuencia_objetivo)
         else:
             cents = resultado["cents"]
@@ -546,11 +615,8 @@ class VentanaPrincipal(wx.Frame):
             self.boton_referencia.SetLabel("Reproducir tono de referencia (Ctrl+P)")
             return
 
-        cuerda_objetivo = self._cuerda_objetivo()
-        if cuerda_objetivo is not None:
-            _, indice_nota, octava = cuerda_objetivo
-            frecuencia = nota_a_frecuencia(indice_nota, octava)
-        else:
+        frecuencia = self._frecuencia_objetivo_actual()
+        if frecuencia is None:
             frecuencia = nota_a_frecuencia(9, 4)  # La4, referencia estándar en modo cromático
 
         if self.casilla_bucle_referencia.GetValue():

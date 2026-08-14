@@ -21,6 +21,7 @@ AJUSTES_POR_DEFECTO = {
     "bucle_referencia": False,
     "avance_automatico": True,
     "umbral_yin": 0.15,
+    "ajustes_finos_cuerdas": {},
 }
 
 

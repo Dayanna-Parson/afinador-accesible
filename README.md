@@ -53,6 +53,24 @@ python iniciar_afinador.py
 
 - `Ctrl+P`: reproducir el tono de referencia de la cuerda/nota seleccionada.
 - `Ctrl+E`: iniciar o detener la escucha del micrófono.
+- `Ctrl+Mayús+Flecha arriba` / `Ctrl+Mayús+Flecha abajo`: retocar la cuerda seleccionada en
+  cuartos de tono (50 cents cada uno; dos cuartos de tono = un semitono).
+- `Ctrl+Mayús+R`: restablecer el retoque de la cuerda seleccionada.
+
+## Retoque fino por cuerda (cuartos de tono)
+
+Cada cuerda puede desplazarse de su nota diatónica de fábrica en pasos de cuarto de tono
+(50 cents), independientemente de las demás. Dos usos:
+
+- **Sostenidos y bemoles fuera de la escala diatónica**: la lira de 16 cuerdas no tiene
+  sostenidos ni bemoles de fábrica; con dos cuartos de tono (un semitono) se puede subir o
+  bajar cualquier cuerda a la nota que haga falta.
+- **Cuartos de tono árabes (maqam)**: con un solo cuarto de tono se afina exactamente a
+  medio camino entre dos semitonos occidentales, como en la música árabe-egipcia.
+
+El retoque se guarda por cuerda (y se recuerda entre sesiones) hasta que se restablece con
+`Ctrl+Mayús+R`. Tanto la instrucción de afinación como el tono de referencia (`Ctrl+P`)
+tienen en cuenta el retoque activo.
 
 ## Ajustes persistentes
 
