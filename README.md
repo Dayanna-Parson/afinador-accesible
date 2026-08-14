@@ -56,6 +56,10 @@ python iniciar_afinador.py
 - `Ctrl+Mayús+Flecha arriba` / `Ctrl+Mayús+Flecha abajo`: retocar la cuerda seleccionada en
   cuartos de tono (50 cents cada uno; dos cuartos de tono = un semitono).
 - `Ctrl+Mayús+R`: restablecer el retoque de la cuerda seleccionada.
+- `Ctrl+Mayús+Z`: deshacer el último retoque en cuartos de tono (sobre cualquier cuerda, no
+  solo la seleccionada).
+- `Ctrl+Mayús+P`: escucha previa de toda la escala/afinación activa, cuerda por cuerda en
+  orden, con los retoques aplicados.
 
 ## Retoque fino por cuerda (cuartos de tono)
 
@@ -106,6 +110,22 @@ una de estas disposiciones y luego doblar la cuerda (bending) por oído.
 
 Cada retoque aplicado por una escala se puede seguir ajustando a mano con
 `Ctrl+Mayús+Flecha arriba/abajo` si el oído dice otra cosa.
+
+## Escucha previa de la escala
+
+`Ctrl+Mayús+P` reproduce, una sola vez y en orden, el tono de referencia de cada cuerda de
+la afinación activa (con sus retoques ya aplicados), para saber de antemano cómo debería
+sonar el instrumento completo antes de afinarlo cuerda por cuerda. Como la mayoría de
+escalas y maqams solo modifican unas pocas cuerdas respecto a la afinación de fábrica, es la
+forma más clara de notar cuáles cambian y cuáles no. Se puede interrumpir a mitad con
+`Ctrl+E` (detiene también la captura del micrófono) o volviendo a pulsar `Ctrl+Mayús+P`.
+
+## Modo solo escucha
+
+La casilla "Modo solo escucha" desactiva las instrucciones de sube/baja y el pitido de
+confirmación: la app solo dice la nota que detecta en cada momento (por ejemplo "Sol3"),
+sin compararla con ninguna cuerda objetivo. Útil para identificar por oído qué se está
+tocando en vez de afinar hacia una nota concreta.
 
 ## Ajustes persistentes
 

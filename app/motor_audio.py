@@ -491,6 +491,39 @@ class GeneradorTonos:
         if self.capturador is not None:
             self.capturador.reanudar()
 
+    def _reproducir_secuencia(self, frecuencias, duracion, pausa, amplitud, al_finalizar):
+        if self.capturador is not None:
+            self.capturador.pausar()
+        try:
+            for frecuencia in frecuencias:
+                if self._detener_bucle.is_set():
+                    break
+                onda = self._generar_onda(frecuencia, duracion, amplitud)
+                sd.play(onda, samplerate=self.tasa_muestreo, blocking=True)
+                if self._detener_bucle.wait(timeout=pausa):
+                    break
+        except Exception:
+            logger.exception("fallo al reproducir la escucha previa de la escala")
+        finally:
+            sd.stop()
+            if self.capturador is not None:
+                self.capturador.reanudar()
+            if al_finalizar:
+                al_finalizar()
+
+    def reproducir_secuencia(self, frecuencias, duracion=0.6, pausa=0.15, amplitud=0.45, al_finalizar=None):
+        """Reproduce una lista de frecuencias en orden, una sola vez (escucha previa de escala).
+
+        Se puede interrumpir a mitad con detener_bucle(), igual que reproducir_en_bucle().
+        """
+        self._detener_bucle.clear()
+        self._hilo_reproduccion = threading.Thread(
+            target=self._reproducir_secuencia,
+            args=(frecuencias, duracion, pausa, amplitud, al_finalizar),
+            daemon=True,
+        )
+        self._hilo_reproduccion.start()
+
     def reproducir_confirmacion(self, frecuencia=880.0, duracion=0.15, amplitud=0.25):
         """Pitido corto de confirmación al alcanzar la afinación correcta."""
         self.reproducir(frecuencia, duracion=duracion, amplitud=amplitud)

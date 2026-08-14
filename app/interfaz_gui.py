@@ -131,6 +131,8 @@ ID_ATAJO_ALTERNAR_ESCUCHA = wx.NewIdRef()
 ID_ATAJO_SUBIR_CUARTO_TONO = wx.NewIdRef()
 ID_ATAJO_BAJAR_CUARTO_TONO = wx.NewIdRef()
 ID_ATAJO_RESTABLECER_AJUSTE_FINO = wx.NewIdRef()
+ID_ATAJO_ESCUCHA_PREVIA_ESCALA = wx.NewIdRef()
+ID_ATAJO_DESHACER_RETOQUE = wx.NewIdRef()
 
 NIVEL_MINIMO_SENAL_DIAGNOSTICO = 0.01
 NIVEL_SENAL_BUENA = 0.08
@@ -149,6 +151,7 @@ class VentanaPrincipal(wx.Frame):
 
         self.ajustes = cargar_ajustes()
         self.ajustes_finos_cuerdas = dict(self.ajustes.get("ajustes_finos_cuerdas", {}))
+        self._historial_retoques = []
         self.anunciador = AnunciadorNVDA()
         self.capturador = None
         self.generador_tonos = GeneradorTonos(tasa_muestreo=44100)
@@ -205,6 +208,12 @@ class VentanaPrincipal(wx.Frame):
         self.casilla_avance_automatico.SetValue(True)
         self.casilla_avance_automatico.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
 
+        self.casilla_modo_solo_escucha = wx.CheckBox(
+            panel, label="Modo solo escucha (dice la nota detectada, sin instrucciones de sube/baja)"
+        )
+        self.casilla_modo_solo_escucha.SetValue(False)
+        self.casilla_modo_solo_escucha.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
+
         self.casilla_exclusivo_wasapi = wx.CheckBox(
             panel, label="Modo exclusivo WASAPI (solo micrófonos dedicados; puede fallar con "
                          "dispositivos compuestos como \"Varios micrófonos\")"
@@ -255,6 +264,7 @@ class VentanaPrincipal(wx.Frame):
             etiqueta_cuerda, self.selector_cuerda,
             etiqueta_escala, self.selector_escala,
             self.casilla_avance_automatico,
+            self.casilla_modo_solo_escucha,
             self.casilla_exclusivo_wasapi,
             etiqueta_ganancia, self.control_ganancia,
             etiqueta_sensibilidad, self.control_sensibilidad,
@@ -267,19 +277,24 @@ class VentanaPrincipal(wx.Frame):
 
     def _construir_atajos(self):
         """Ctrl+P reproduce el tono de referencia, Ctrl+E alterna la escucha, Ctrl+Mayús+Flecha
-        arriba/abajo retoca la cuerda seleccionada en cuartos de tono, y Ctrl+Mayús+R restablece
-        ese retoque. Nunca se usa la tecla Espacio."""
+        arriba/abajo retoca la cuerda seleccionada en cuartos de tono, Ctrl+Mayús+R restablece
+        ese retoque, Ctrl+Mayús+Z deshace el último retoque, y Ctrl+Mayús+P reproduce una
+        escucha previa de toda la escala/afinación activa. Nunca se usa la tecla Espacio."""
         self.Bind(wx.EVT_MENU, self._al_reproducir_referencia, id=ID_ATAJO_REPRODUCIR_REFERENCIA)
         self.Bind(wx.EVT_MENU, self._al_alternar_escucha, id=ID_ATAJO_ALTERNAR_ESCUCHA)
         self.Bind(wx.EVT_MENU, self._al_subir_cuarto_tono, id=ID_ATAJO_SUBIR_CUARTO_TONO)
         self.Bind(wx.EVT_MENU, self._al_bajar_cuarto_tono, id=ID_ATAJO_BAJAR_CUARTO_TONO)
         self.Bind(wx.EVT_MENU, self._al_restablecer_ajuste_fino, id=ID_ATAJO_RESTABLECER_AJUSTE_FINO)
+        self.Bind(wx.EVT_MENU, self._al_escucha_previa_escala, id=ID_ATAJO_ESCUCHA_PREVIA_ESCALA)
+        self.Bind(wx.EVT_MENU, self._al_deshacer_retoque, id=ID_ATAJO_DESHACER_RETOQUE)
         tabla = wx.AcceleratorTable([
             (wx.ACCEL_CTRL, ord("P"), ID_ATAJO_REPRODUCIR_REFERENCIA),
             (wx.ACCEL_CTRL, ord("E"), ID_ATAJO_ALTERNAR_ESCUCHA),
             (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, wx.WXK_UP, ID_ATAJO_SUBIR_CUARTO_TONO),
             (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, wx.WXK_DOWN, ID_ATAJO_BAJAR_CUARTO_TONO),
             (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("R"), ID_ATAJO_RESTABLECER_AJUSTE_FINO),
+            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("P"), ID_ATAJO_ESCUCHA_PREVIA_ESCALA),
+            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("Z"), ID_ATAJO_DESHACER_RETOQUE),
         ])
         self.SetAcceleratorTable(tabla)
 
@@ -316,6 +331,7 @@ class VentanaPrincipal(wx.Frame):
         self.control_sensibilidad.SetValue(float(self.ajustes.get("umbral_yin", 0.15)))
         self.casilla_bucle_referencia.SetValue(bool(self.ajustes.get("bucle_referencia", False)))
         self.casilla_avance_automatico.SetValue(bool(self.ajustes.get("avance_automatico", True)))
+        self.casilla_modo_solo_escucha.SetValue(bool(self.ajustes.get("modo_solo_escucha", False)))
 
         nombre_instrumento = self.ajustes.get("instrumento")
         if nombre_instrumento and nombre_instrumento in PRESETS_INSTRUMENTO:
@@ -347,6 +363,7 @@ class VentanaPrincipal(wx.Frame):
             "umbral_yin": self.control_sensibilidad.GetValue(),
             "bucle_referencia": self.casilla_bucle_referencia.GetValue(),
             "avance_automatico": self.casilla_avance_automatico.GetValue(),
+            "modo_solo_escucha": self.casilla_modo_solo_escucha.GetValue(),
             "ajustes_finos_cuerdas": self.ajustes_finos_cuerdas,
         })
         guardar_ajustes(self.ajustes)
@@ -460,7 +477,9 @@ class VentanaPrincipal(wx.Frame):
             self.anunciador.hablar("No hay ninguna cuerda seleccionada para retocar.")
             return
         cuerda_objetivo = self._cuerda_objetivo()
-        cuartos_tono = self.ajustes_finos_cuerdas.get(clave, 0) + delta
+        cuartos_tono_previo = self.ajustes_finos_cuerdas.get(clave, 0)
+        self._historial_retoques.append((clave, cuartos_tono_previo))
+        cuartos_tono = cuartos_tono_previo + delta
         self.ajustes_finos_cuerdas[clave] = cuartos_tono
         self._guardar_ajustes_actuales()
         self.anunciador.reiniciar_estado()
@@ -498,6 +517,40 @@ class VentanaPrincipal(wx.Frame):
         self._avance_ya_realizado = False
         self._historial_frecuencias.clear()
         self.anunciador.hablar("Retoque restablecido.")
+
+    def _al_deshacer_retoque(self, evento):
+        if not self._historial_retoques:
+            self.anunciador.hablar("No hay ningún retoque que deshacer.")
+            return
+        clave, cuartos_tono_previo = self._historial_retoques.pop()
+        if cuartos_tono_previo == 0:
+            self.ajustes_finos_cuerdas.pop(clave, None)
+        else:
+            self.ajustes_finos_cuerdas[clave] = cuartos_tono_previo
+        self._guardar_ajustes_actuales()
+        self.anunciador.reiniciar_estado()
+        self._afinada_desde = None
+        self._avance_ya_realizado = False
+        self._historial_frecuencias.clear()
+        _, nombre_cuerda = clave.split("||", 1)
+        self.anunciador.hablar("Deshecho el último retoque de {}.".format(nombre_cuerda))
+
+    def _al_escucha_previa_escala(self, evento):
+        instrumento = self.selector_instrumento.GetStringSelection()
+        preset = PRESETS_INSTRUMENTO.get(instrumento)
+        if not preset:
+            self.anunciador.hablar("No hay ninguna afinación que previsualizar en modo Cromático.")
+            return
+        frecuencias = []
+        for nombre_cuerda, indice_nota, octava in preset:
+            clave = "{}||{}".format(instrumento, nombre_cuerda)
+            cuartos_tono = self.ajustes_finos_cuerdas.get(clave, 0)
+            frecuencias.append(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono))
+        self.anunciador.hablar("Escucha previa de la escala: {} cuerdas.".format(len(frecuencias)))
+        self.generador_tonos.reproducir_secuencia(
+            frecuencias,
+            al_finalizar=lambda: wx.CallAfter(self.anunciador.hablar, "Escucha previa terminada.")
+        )
 
     def _al_cambiar_dispositivo(self, evento):
         self._guardar_ajustes_actuales()
@@ -685,7 +738,6 @@ class VentanaPrincipal(wx.Frame):
         self.etiqueta_nota.SetLabel(
             "Nota detectada: {}{} ({:+.0f} cents)".format(resultado["nombre"], resultado["octava"], cents)
         )
-        self.etiqueta_instruccion.SetLabel("Instrucción: {}".format(texto_instruccion))
 
         if registrar_log:
             logger.info(
@@ -693,6 +745,17 @@ class VentanaPrincipal(wx.Frame):
                 rms, resultado["nombre"], resultado["octava"], cents, instruccion,
                 self.selector_instrumento.GetStringSelection(), self.selector_cuerda.GetStringSelection(),
             )
+
+        if self.casilla_modo_solo_escucha.GetValue():
+            # Solo dice la nota que suena, sin instrucciones de sube/baja ni confirmación de
+            # afinada: para quien solo quiere identificar por oído lo que está tocando.
+            self.etiqueta_instruccion.SetLabel("Instrucción: — (modo solo escucha)")
+            self.anunciador.procesar_instruccion(
+                "{}{}".format(resultado["nombre"], resultado["octava"])
+            )
+            return
+
+        self.etiqueta_instruccion.SetLabel("Instrucción: {}".format(texto_instruccion))
 
         if instruccion != "AFINADA":
             self._confirmacion_pendiente = True

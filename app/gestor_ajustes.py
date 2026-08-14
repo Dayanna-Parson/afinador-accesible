@@ -20,6 +20,7 @@ AJUSTES_POR_DEFECTO = {
     "ganancia": 1.0,
     "bucle_referencia": False,
     "avance_automatico": True,
+    "modo_solo_escucha": False,
     "umbral_yin": 0.15,
     "ajustes_finos_cuerdas": {},
 }
