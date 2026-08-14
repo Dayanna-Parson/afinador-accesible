@@ -72,6 +72,27 @@ El retoque se guarda por cuerda (y se recuerda entre sesiones) hasta que se rest
 `Ctrl+Mayús+R`. Tanto la instrucción de afinación como el tono de referencia (`Ctrl+P`)
 tienen en cuenta el retoque activo.
 
+## Escalas de maqam árabe (solo lira)
+
+El selector "Escala" (activo solo con la lira de 16 cuerdas seleccionada) aplica de golpe
+los retoques de cuarto de tono de un maqam sobre la afinación diatónica de fábrica:
+
+- **Maqam Rast (sobre Sol)**: la cuerda de Si baja medio tono y la de Fa sube medio tono
+  (cuarto de tono cada una), en todas las octavas.
+- **Maqam Bayati (sobre Re)**: la cuerda de Si baja un semitono completo y la de Mi baja
+  medio tono.
+- **Maqam Hijaz (sobre Re)**: la cuerda de Si baja un semitono, la de Mi baja un semitono
+  y la de Fa sube un semitono (el característico segundo aumentado del maqam).
+
+Patrones verificados contra la teoría estándar de intervalos en cuartos de tono. Cada
+retoque aplicado por una escala se puede seguir ajustando a mano con
+`Ctrl+Mayús+Flecha arriba/abajo` si el oído dice otra cosa.
+
+En guitarra y ukelele el retoque de cuarto de tono también funciona, pero solo desplaza la
+cuerda al aire entera: los trastes siguen fijos en semitonos occidentales, así que no crea
+notas de cuarto de tono nuevas en el mástil (para eso hacen falta trastes especiales o
+técnica de bending, algo ajeno a la afinación).
+
 ## Ajustes persistentes
 
 El dispositivo de entrada, la tasa de muestreo, el tamaño de búfer, el instrumento y la

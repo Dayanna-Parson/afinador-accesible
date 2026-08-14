@@ -53,6 +53,29 @@ PRESETS_INSTRUMENTO = {
     ],
 }
 
+NOMBRE_LIRA = "Lira de 16 cuerdas (Aklot)"
+ESCALA_DIATONICA = "Diatónica de fábrica"
+
+# Desplazamiento en cuartos de tono (50 cents cada uno) sobre la afinación diatónica de
+# fábrica de la lira, para cada maqam. Patrones verificados contra la teoría estándar
+# (Touma, "The Music of the Arabs"): Rast sobre Sol (4,3,3,4,4,3,3 cuartos de tono desde
+# la tónica), Bayati sobre Re (3,3,4,4,2,4,4) e Hijaz sobre Re (2,6,2,4,2,4,4). Al coincidir
+# la afinación diatónica de la lira con las notas naturales, solo hace falta retocar las
+# cuerdas cuyo grado cambia respecto al maqam; el resto se queda igual.
+ESCALAS_LIRA = {
+    ESCALA_DIATONICA: {},
+    "Maqam Rast (sobre Sol)": {
+        "Cuerda 3 (Si)": -1, "Cuerda 7 (Fa)": 1, "Cuerda 10 (Si)": -1, "Cuerda 14 (Fa)": 1,
+    },
+    "Maqam Bayati (sobre Re)": {
+        "Cuerda 3 (Si)": -2, "Cuerda 6 (Mi)": -1, "Cuerda 10 (Si)": -2, "Cuerda 13 (Mi)": -1,
+    },
+    "Maqam Hijaz (sobre Re)": {
+        "Cuerda 3 (Si)": -2, "Cuerda 6 (Mi)": -2, "Cuerda 7 (Fa)": 2,
+        "Cuerda 10 (Si)": -2, "Cuerda 13 (Mi)": -2, "Cuerda 14 (Fa)": 2,
+    },
+}
+
 OPCIONES_TASA_MUESTREO = [
     ("Automática (recomendada)", None),
     ("44100 Hz", 44100),
@@ -138,6 +161,11 @@ class VentanaPrincipal(wx.Frame):
         self.selector_cuerda = wx.Choice(panel)
         self.selector_cuerda.Bind(wx.EVT_CHOICE, self._al_cambiar_cuerda)
 
+        etiqueta_escala = wx.StaticText(panel, label="Escala (solo lira):")
+        self.selector_escala = wx.Choice(panel, choices=list(ESCALAS_LIRA.keys()))
+        self.selector_escala.SetSelection(0)
+        self.selector_escala.Bind(wx.EVT_CHOICE, self._al_cambiar_escala)
+
         self.casilla_avance_automatico = wx.CheckBox(panel, label="Avanzar automáticamente a la siguiente cuerda al afinar")
         self.casilla_avance_automatico.SetValue(True)
         self.casilla_avance_automatico.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
@@ -190,6 +218,7 @@ class VentanaPrincipal(wx.Frame):
             etiqueta_buffer, self.selector_buffer,
             etiqueta_instrumento, self.selector_instrumento,
             etiqueta_cuerda, self.selector_cuerda,
+            etiqueta_escala, self.selector_escala,
             self.casilla_avance_automatico,
             self.casilla_exclusivo_wasapi,
             etiqueta_ganancia, self.control_ganancia,
@@ -313,12 +342,31 @@ class VentanaPrincipal(wx.Frame):
                 self.selector_cuerda.Append(nombre_cuerda)
             self.selector_cuerda.SetSelection(0)
             self.selector_cuerda.Enable()
+        self.selector_escala.Enable(self.selector_instrumento.GetStringSelection() == NOMBRE_LIRA)
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
         self._avance_ya_realizado = False
         if evento is not None:
             self._guardar_ajustes_actuales()
             evento.Skip()
+
+    def _al_cambiar_escala(self, evento):
+        instrumento = self.selector_instrumento.GetStringSelection()
+        nombre_escala = self.selector_escala.GetStringSelection()
+        desplazamientos = ESCALAS_LIRA.get(nombre_escala, {})
+        for nombre_cuerda, _, _ in PRESETS_INSTRUMENTO.get(instrumento) or []:
+            clave = "{}||{}".format(instrumento, nombre_cuerda)
+            if nombre_cuerda in desplazamientos:
+                self.ajustes_finos_cuerdas[clave] = desplazamientos[nombre_cuerda]
+            else:
+                self.ajustes_finos_cuerdas.pop(clave, None)
+        self._guardar_ajustes_actuales()
+        self.anunciador.reiniciar_estado()
+        self._afinada_desde = None
+        self._avance_ya_realizado = False
+        self._historial_frecuencias.clear()
+        self.anunciador.hablar("Escala aplicada: {}.".format(nombre_escala))
+        evento.Skip()
 
     def _al_cambiar_cuerda(self, evento):
         self.anunciador.reiniciar_estado()
