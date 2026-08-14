@@ -93,6 +93,15 @@ ESCALAS_POR_INSTRUMENTO = {
             "Cuerda 6 (Mi)": -4, "Cuerda 3 (Sol)": -2, "Cuerda 2 (Si)": -4, "Cuerda 1 (Mi)": -4,
         },
         "DADGAD (Re La Re Sol La Re)": {"Cuerda 6 (Mi)": -4, "Cuerda 2 (Si)": -4, "Cuerda 1 (Mi)": -4},
+        "Open C (Do Sol Do Sol Do Mi)": {
+            "Cuerda 6 (Mi)": -8, "Cuerda 5 (La)": -4, "Cuerda 4 (Re)": -4, "Cuerda 2 (Si)": 2,
+        },
+        "Open E (Mi Si Mi Sol# Si Mi)": {
+            "Cuerda 5 (La)": 4, "Cuerda 4 (Re)": 4, "Cuerda 3 (Sol)": 2,
+        },
+        "Open A (Mi La Mi La Do# Mi)": {
+            "Cuerda 4 (Re)": 4, "Cuerda 3 (Sol)": 4, "Cuerda 2 (Si)": 4,
+        },
     },
     NOMBRE_UKELELE: {
         "Estándar (Sol Do Mi La, reentrante)": {},
