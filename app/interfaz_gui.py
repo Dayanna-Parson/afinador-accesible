@@ -154,10 +154,12 @@ class VentanaPrincipal(wx.Frame):
             panel, min=1.0, max=5.0, initial=1.0, inc=0.5
         )
         self.control_ganancia.SetDigits(1)
-        # SpinCtrlDouble no toma el nombre accesible del StaticText contiguo: hay que
-        # ponérselo explícitamente o NVDA lo anuncia como "edición" sin ninguna etiqueta.
         self.control_ganancia.SetLabel("Ganancia de entrada")
         self.control_ganancia.Bind(wx.EVT_SPINCTRLDOUBLE, self._al_cambiar_calidad_captura)
+        # SpinCtrlDouble no toma el nombre accesible del StaticText contiguo ni respeta
+        # siempre SetLabel() en NVDA: se anuncia el valor con voz propia al recibir el foco,
+        # el mismo patrón que ya se usa en el resto de la app para lo que SetLabel() no cubre.
+        self.control_ganancia.Bind(wx.EVT_SET_FOCUS, self._al_enfocar_control_ganancia)
 
         etiqueta_sensibilidad = wx.StaticText(panel, label="Sensibilidad de detección (más alto = más permisivo):")
         self.control_sensibilidad = wx.SpinCtrlDouble(
@@ -166,6 +168,7 @@ class VentanaPrincipal(wx.Frame):
         self.control_sensibilidad.SetDigits(2)
         self.control_sensibilidad.SetLabel("Sensibilidad de detección")
         self.control_sensibilidad.Bind(wx.EVT_SPINCTRLDOUBLE, self._al_cambiar_calidad_captura)
+        self.control_sensibilidad.Bind(wx.EVT_SET_FOCUS, self._al_enfocar_control_sensibilidad)
 
         self.etiqueta_nota = wx.StaticText(panel, label="Nota detectada: —")
         self.etiqueta_instruccion = wx.StaticText(panel, label="Instrucción: —")
@@ -322,6 +325,9 @@ class VentanaPrincipal(wx.Frame):
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._guardar_ajustes_actuales()
+        cuartos_tono = self._cuartos_tono_actual()
+        if cuartos_tono != 0:
+            self.anunciador.hablar("Retocada: {:+d} cents.".format(cuartos_tono * CENTS_POR_CUARTO_TONO))
         evento.Skip()
 
     def _cuerda_objetivo(self):
@@ -359,6 +365,7 @@ class VentanaPrincipal(wx.Frame):
         if clave is None:
             self.anunciador.hablar("No hay ninguna cuerda seleccionada para retocar.")
             return
+        cuerda_objetivo = self._cuerda_objetivo()
         cuartos_tono = self.ajustes_finos_cuerdas.get(clave, 0) + delta
         self.ajustes_finos_cuerdas[clave] = cuartos_tono
         self._guardar_ajustes_actuales()
@@ -366,8 +373,15 @@ class VentanaPrincipal(wx.Frame):
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._historial_frecuencias.clear()
+
+        _, indice_nota, octava = cuerda_objetivo
+        nota_resultante = frecuencia_a_nota(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono))
         cents_totales = cuartos_tono * CENTS_POR_CUARTO_TONO
-        self.anunciador.hablar("Retoque: {:+d} cents.".format(cents_totales))
+        self.anunciador.hablar(
+            "Retoque: {:+d} cents. Nota más cercana: {}{}.".format(
+                cents_totales, nota_resultante["nombre"], nota_resultante["octava"]
+            )
+        )
 
     def _al_subir_cuarto_tono(self, evento):
         self._desplazar_cuarto_tono(1)
@@ -402,6 +416,14 @@ class VentanaPrincipal(wx.Frame):
         if estaba_escuchando:
             self._detener_escucha()
             self._iniciar_escucha()
+        evento.Skip()
+
+    def _al_enfocar_control_ganancia(self, evento):
+        self.anunciador.hablar("Ganancia de entrada: {:.1f}".format(self.control_ganancia.GetValue()))
+        evento.Skip()
+
+    def _al_enfocar_control_sensibilidad(self, evento):
+        self.anunciador.hablar("Sensibilidad de detección: {:.2f}".format(self.control_sensibilidad.GetValue()))
         evento.Skip()
 
     def _indice_dispositivo_seleccionado(self):
