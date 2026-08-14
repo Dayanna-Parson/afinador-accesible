@@ -21,6 +21,8 @@ AJUSTES_POR_DEFECTO = {
     "bucle_referencia": False,
     "avance_automatico": True,
     "modo_solo_escucha": False,
+    "deteccion_automatica_cuerda": False,
+    "instrucciones_detalladas": False,
     "umbral_yin": 0.15,
     "ajustes_finos_cuerdas": {},
 }

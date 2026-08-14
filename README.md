@@ -59,7 +59,7 @@ python iniciar_afinador.py
 - `Ctrl+Mayús+Z`: deshacer el último retoque en cuartos de tono (sobre cualquier cuerda, no
   solo la seleccionada).
 - `Ctrl+Mayús+P`: escucha previa de toda la escala/afinación activa, cuerda por cuerda en
-  orden, con los retoques aplicados.
+  orden, con los retoques aplicados (comparación A/B en las cuerdas retocadas).
 
 ## Retoque fino por cuerda (cuartos de tono)
 
@@ -120,12 +120,30 @@ escalas y maqams solo modifican unas pocas cuerdas respecto a la afinación de f
 forma más clara de notar cuáles cambian y cuáles no. Se puede interrumpir a mitad con
 `Ctrl+E` (detiene también la captura del micrófono) o volviendo a pulsar `Ctrl+Mayús+P`.
 
+En las cuerdas que llevan retoque, la escucha previa reproduce primero la nota de fábrica y
+justo después la retocada (comparación A/B), porque un cuarto de tono es una diferencia
+sutil que se nota mucho mejor por contraste directo que recordando cómo sonaba antes.
+
 ## Modo solo escucha
 
 La casilla "Modo solo escucha" desactiva las instrucciones de sube/baja y el pitido de
 confirmación: la app solo dice la nota que detecta en cada momento (por ejemplo "Sol3"),
 sin compararla con ninguna cuerda objetivo. Útil para identificar por oído qué se está
 tocando en vez de afinar hacia una nota concreta.
+
+## Detección automática de cuerda
+
+La casilla "Detectar automáticamente qué cuerda suena" compara la nota detectada contra
+todas las cuerdas de la afinación activa (con sus retoques) y selecciona sola la más
+cercana, anunciando "Cuerda detectada: ...". Así no hace falta navegar el selector de cuerda
+a mano antes de tocar cada una; solo cambia de cuerda seleccionada si la coincidencia es
+razonablemente cercana (55 cents), para no saltar con ruido o armónicos ambiguos.
+
+## Nivel de detalle de las instrucciones
+
+El selector "Nivel de detalle de las instrucciones" tiene dos opciones: "Conciso" (la
+instrucción sola, p. ej. "Sube un poco") y "Detallado", que añade los cents exactos de
+desviación (p. ej. "Sube un poco (+18 cents)").
 
 ## Ajustes persistentes
 

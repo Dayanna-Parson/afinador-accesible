@@ -200,6 +200,29 @@ identificar por oído lo que suena en vez de afinar hacia un objetivo. Si se toc
 mantener el `return` temprano que evita ejecutar el resto de la lógica de afinación con la
 casilla activa, o volverán a sonar instrucciones que el modo promete no dar.
 
+### Detección automática de cuerda
+`casilla_deteccion_automatica_cuerda` (persistida como `deteccion_automatica_cuerda`), opt-in
+y desactivada por defecto. `_detectar_cuerda_automaticamente()`, llamada desde
+`_actualizar_deteccion` justo después del filtro de mediana, compara la frecuencia detectada
+contra la frecuencia real (con retoque) de cada cuerda del preset activo y selecciona la más
+cercana con `selector_cuerda.SetSelection()` — que **no** dispara `EVT_CHOICE`, así que el
+propio método reproduce a mano el reinicio de estado que haría `_al_cambiar_cuerda`. Solo
+cambia de cuerda si la diferencia es menor a `MARGEN_CENTS_DETECCION_AUTOMATICA` (55 cents),
+para no saltar de cuerda con ruido o armónicos ambiguos entre cuerdas adyacentes.
+
+### Comparación A/B en la escucha previa
+Cuando una cuerda de la escala activa lleva retoque, `_al_escucha_previa_escala` la incluye
+dos veces seguidas en la lista de frecuencias que pasa a `reproducir_secuencia()`: primero la
+nota de fábrica, luego la retocada. Un cuarto de tono (50 cents) es una diferencia real pero
+difícil de identificar en una nota aislada; el contraste A/B es lo que la hace audible sin
+depender de que la usuaria recuerde cómo sonaba la cuerda anterior.
+
+### Nivel de detalle de las instrucciones
+`selector_verbosidad` (persistido como `instrucciones_detalladas`) tiene dos modos: conciso
+(el texto de `TEXTOS_INSTRUCCION` tal cual) y detallado, que le añade los cents exactos con
+`.format()` después de traducir/construir el texto base — nunca antes, para no romper el
+diccionario `TEXTOS_INSTRUCCION` con cadenas dinámicas.
+
 ### Errores: nunca silenciosos
 Prohibido `except: pass` o `except Exception: pass` sin logging. Mínimo:
 ```python

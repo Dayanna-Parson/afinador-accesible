@@ -214,6 +214,17 @@ class VentanaPrincipal(wx.Frame):
         self.casilla_modo_solo_escucha.SetValue(False)
         self.casilla_modo_solo_escucha.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
 
+        self.casilla_deteccion_automatica_cuerda = wx.CheckBox(
+            panel, label="Detectar automáticamente qué cuerda suena (sin tener que seleccionarla antes)"
+        )
+        self.casilla_deteccion_automatica_cuerda.SetValue(False)
+        self.casilla_deteccion_automatica_cuerda.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
+
+        etiqueta_verbosidad = wx.StaticText(panel, label="Nivel de detalle de las instrucciones:")
+        self.selector_verbosidad = wx.Choice(panel, choices=["Conciso", "Detallado (con cents exactos)"])
+        self.selector_verbosidad.SetSelection(0)
+        self.selector_verbosidad.Bind(wx.EVT_CHOICE, self._al_cambiar_ajuste_simple)
+
         self.casilla_exclusivo_wasapi = wx.CheckBox(
             panel, label="Modo exclusivo WASAPI (solo micrófonos dedicados; puede fallar con "
                          "dispositivos compuestos como \"Varios micrófonos\")"
@@ -265,6 +276,8 @@ class VentanaPrincipal(wx.Frame):
             etiqueta_escala, self.selector_escala,
             self.casilla_avance_automatico,
             self.casilla_modo_solo_escucha,
+            self.casilla_deteccion_automatica_cuerda,
+            etiqueta_verbosidad, self.selector_verbosidad,
             self.casilla_exclusivo_wasapi,
             etiqueta_ganancia, self.control_ganancia,
             etiqueta_sensibilidad, self.control_sensibilidad,
@@ -332,6 +345,10 @@ class VentanaPrincipal(wx.Frame):
         self.casilla_bucle_referencia.SetValue(bool(self.ajustes.get("bucle_referencia", False)))
         self.casilla_avance_automatico.SetValue(bool(self.ajustes.get("avance_automatico", True)))
         self.casilla_modo_solo_escucha.SetValue(bool(self.ajustes.get("modo_solo_escucha", False)))
+        self.casilla_deteccion_automatica_cuerda.SetValue(
+            bool(self.ajustes.get("deteccion_automatica_cuerda", False))
+        )
+        self.selector_verbosidad.SetSelection(1 if self.ajustes.get("instrucciones_detalladas", False) else 0)
 
         nombre_instrumento = self.ajustes.get("instrumento")
         if nombre_instrumento and nombre_instrumento in PRESETS_INSTRUMENTO:
@@ -364,6 +381,8 @@ class VentanaPrincipal(wx.Frame):
             "bucle_referencia": self.casilla_bucle_referencia.GetValue(),
             "avance_automatico": self.casilla_avance_automatico.GetValue(),
             "modo_solo_escucha": self.casilla_modo_solo_escucha.GetValue(),
+            "deteccion_automatica_cuerda": self.casilla_deteccion_automatica_cuerda.GetValue(),
+            "instrucciones_detalladas": self.selector_verbosidad.GetSelection() == 1,
             "ajustes_finos_cuerdas": self.ajustes_finos_cuerdas,
         })
         guardar_ajustes(self.ajustes)
@@ -542,11 +561,26 @@ class VentanaPrincipal(wx.Frame):
             self.anunciador.hablar("No hay ninguna afinación que previsualizar en modo Cromático.")
             return
         frecuencias = []
+        cuerdas_con_retoque = 0
         for nombre_cuerda, indice_nota, octava in preset:
             clave = "{}||{}".format(instrumento, nombre_cuerda)
             cuartos_tono = self.ajustes_finos_cuerdas.get(clave, 0)
-            frecuencias.append(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono))
-        self.anunciador.hablar("Escucha previa de la escala: {} cuerdas.".format(len(frecuencias)))
+            if cuartos_tono != 0:
+                # Comparación A/B: primero la nota de fábrica y luego la retocada, seguidas,
+                # para notar el cuarto de tono por contraste directo en vez de tener que
+                # recordar cómo sonaba la cuerda anterior.
+                cuerdas_con_retoque += 1
+                frecuencias.append(frecuencia_con_desplazamiento(indice_nota, octava, 0))
+                frecuencias.append(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono))
+            else:
+                frecuencias.append(frecuencia_con_desplazamiento(indice_nota, octava, 0))
+        if cuerdas_con_retoque:
+            self.anunciador.hablar(
+                "Escucha previa de la escala: {} cuerdas, {} con retoque (fábrica y luego "
+                "retocada).".format(len(preset), cuerdas_con_retoque)
+            )
+        else:
+            self.anunciador.hablar("Escucha previa de la escala: {} cuerdas.".format(len(preset)))
         self.generador_tonos.reproducir_secuencia(
             frecuencias,
             al_finalizar=lambda: wx.CallAfter(self.anunciador.hablar, "Escucha previa terminada.")
@@ -675,6 +709,39 @@ class VentanaPrincipal(wx.Frame):
             return "senal_debil"
         return "senal_buena"
 
+    MARGEN_CENTS_DETECCION_AUTOMATICA = 55
+
+    def _detectar_cuerda_automaticamente(self, frecuencia_filtrada):
+        """Compara la frecuencia detectada contra todas las cuerdas del preset activo (con sus
+        retoques) y selecciona la más cercana, sin que la usuaria tenga que elegir cuerda antes
+        de tocar. Solo cambia de selección si la coincidencia es razonablemente cercana, para no
+        saltar de cuerda con ruido o armónicos ambiguos."""
+        preset = self._preset_actual()
+        if not preset:
+            return
+        instrumento = self.selector_instrumento.GetStringSelection()
+        mejor_indice = None
+        mejor_diferencia = None
+        for indice, (nombre_cuerda, indice_nota, octava) in enumerate(preset):
+            clave = "{}||{}".format(instrumento, nombre_cuerda)
+            cuartos_tono = self.ajustes_finos_cuerdas.get(clave, 0)
+            frecuencia_cuerda = frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono)
+            diferencia = abs(1200 * np.log2(frecuencia_filtrada / frecuencia_cuerda))
+            if mejor_diferencia is None or diferencia < mejor_diferencia:
+                mejor_diferencia = diferencia
+                mejor_indice = indice
+
+        if (mejor_indice is None or mejor_diferencia > self.MARGEN_CENTS_DETECCION_AUTOMATICA
+                or mejor_indice == self.selector_cuerda.GetSelection()):
+            return
+
+        self.selector_cuerda.SetSelection(mejor_indice)
+        self.anunciador.hablar("Cuerda detectada: {}.".format(preset[mejor_indice][0]))
+        self.anunciador.reiniciar_estado()
+        self._afinada_desde = None
+        self._avance_ya_realizado = False
+        self._confirmacion_pendiente = True
+
     def _actualizar_deteccion(self, resultado, rms):
         self._nivel_maximo_observado = max(getattr(self, "_nivel_maximo_observado", 0.0), rms)
         self.etiqueta_nivel.SetLabel("Nivel de entrada: {:.3f}".format(rms))
@@ -725,6 +792,9 @@ class VentanaPrincipal(wx.Frame):
         frecuencia_filtrada = statistics.median(self._historial_frecuencias)
         resultado = frecuencia_a_nota(frecuencia_filtrada)
 
+        if self.casilla_deteccion_automatica_cuerda.GetValue():
+            self._detectar_cuerda_automaticamente(frecuencia_filtrada)
+
         cuerda_objetivo = self._cuerda_objetivo()
         frecuencia_objetivo = self._frecuencia_objetivo_actual()
         if frecuencia_objetivo is not None:
@@ -734,6 +804,8 @@ class VentanaPrincipal(wx.Frame):
 
         instruccion = calcular_instruccion(cents)
         texto_instruccion = TEXTOS_INSTRUCCION.get(instruccion, "—")
+        if self.selector_verbosidad.GetSelection() == 1 and instruccion is not None:
+            texto_instruccion = "{} ({:+.0f} cents)".format(texto_instruccion, cents)
 
         self.etiqueta_nota.SetLabel(
             "Nota detectada: {}{} ({:+.0f} cents)".format(resultado["nombre"], resultado["octava"], cents)
