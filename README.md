@@ -52,6 +52,21 @@ En Windows hace falta el toolchain de Rust (`rustup`) y Visual Studio Build Tool
 python iniciar_afinador.py
 ```
 
+## Interfaz y accesibilidad
+
+La ventana tiene un tamaño inicial cómodo sin maximizar y se adapta si se hace
+más grande. Las tres pestañas siguen el orden de una sesión normal:
+
+- **Afinar**: instrumento, cuerda, detección, indicaciones y tonos de referencia.
+- **Afinaciones especiales**: afinaciones alternativas y la escucha previa.
+- **Audio y ajustes**: dispositivo, canal de la Scarlett, WASAPI, nivel de entrada,
+  calibración y opciones menos frecuentes.
+
+Al cambiar de pestaña, el foco pasa a su primer control útil. Los botones tienen
+texto completo; los iconos nativos son un apoyo visual, nunca la única señal. La
+carpeta `recursos/sonidos/` está preparada para efectos opcionales que tampoco
+sustituirán los anuncios de NVDA, JAWS o Narrador.
+
 ## Atajos de teclado
 
 - `Ctrl+P`: reproducir el tono de referencia de la cuerda/nota seleccionada.
@@ -86,7 +101,7 @@ tienen en cuenta el retoque activo.
 
 ## Escalas y afinaciones alternativas
 
-El selector "Escala / afinación" cambia de opciones según el instrumento activo y aplica
+El selector "Escala o afinación" cambia de opciones según el instrumento activo y aplica
 de golpe los retoques correspondientes sobre la afinación de fábrica.
 
 ### Lira: maqam árabe (cuartos de tono)
@@ -129,9 +144,9 @@ escalas y maqams solo modifican unas pocas cuerdas respecto a la afinación de f
 forma más clara de notar cuáles cambian y cuáles no. Se puede interrumpir a mitad con
 `Ctrl+E` (detiene también la captura del micrófono) o volviendo a pulsar `Ctrl+Mayús+P`.
 
-En las cuerdas que llevan retoque, la escucha previa reproduce primero la nota de fábrica y
-justo después la retocada (comparación A/B), porque un cuarto de tono es una diferencia
-sutil que se nota mucho mejor por contraste directo que recordando cómo sonaba antes.
+La escucha previa reproduce una vez las notas objetivo completas, desde la cuerda más grave
+hasta la más aguda. Así permite comprobar cómo debe quedar el instrumento sin mezclar la
+afinación de fábrica con otra nota de comparación.
 
 ## Modo solo escucha
 
@@ -190,10 +205,12 @@ app/
 ├── motor_audio.py     # Captura de audio (dispatcher Rust/Python), algoritmo YIN de respaldo,
 │                       # generador de tonos de referencia
 ├── conector_nvda.py   # Salida de voz al lector de pantalla activo, con throttling por estabilidad
-├── interfaz_gui.py    # Ventana principal wxPython
+├── interfaz/          # Ventana principal y recursos de interfaz wxPython
+├── interfaz_gui.py    # Fachada de compatibilidad para importaciones anteriores
 ├── gestor_ajustes.py  # Persistencia atómica de ajustes en configuraciones/ajustes.json
 ├── control_microfono.py  # Desmute automático del micrófono a nivel de Windows (pycaw)
 └── config_rutas.py    # Rutas absolutas del proyecto
+recursos/sonidos/       # Ubicación documentada para efectos WAV opcionales
 motor_rust/             # Extensión nativa opcional: captura de audio (cpal) + YIN, vía PyO3
 tests/                  # Pruebas del algoritmo YIN y la lógica de notas/instrucciones
 iniciar_afinador.py     # Punto de entrada
