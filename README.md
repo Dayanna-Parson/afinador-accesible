@@ -58,14 +58,18 @@ python iniciar_afinador.py
 - `Ctrl+E`: iniciar o detener la escucha del micrófono.
 - `Ctrl+Mayús+Flecha arriba` / `Ctrl+Mayús+Flecha abajo`: retocar la cuerda seleccionada en
   cuartos de tono (50 cents cada uno; dos cuartos de tono = un semitono).
-- `Ctrl+Mayús+R`: restablecer el retoque de la cuerda seleccionada.
+- `Ctrl+Mayús+R`: restablecer únicamente el ajuste manual de la cuerda seleccionada; la
+  afinación o maqam elegido se conserva.
 - `Ctrl+Mayús+Z`: deshacer el último retoque en cuartos de tono (sobre cualquier cuerda, no
   solo la seleccionada).
-- `Ctrl+Mayús+P`: escucha previa de toda la escala/afinación activa, cuerda por cuerda en
-  orden, con los retoques aplicados (comparación A/B en las cuerdas retocadas).
+- `Ctrl+Mayús+P`: escucha previa de toda la afinación objetivo, cuerda por cuerda desde la
+  más grave a la más aguda.
 - `Ctrl+Mayús+V`: repetir la última instrucción de afinación anunciada.
 
 ## Retoque fino por cuerda (cuartos de tono)
+
+Para el mapa técnico, las reglas de accesibilidad y las pruebas, consulta
+[DEVELOPMENT.md](DEVELOPMENT.md) y [estructura_proyecto.txt](estructura_proyecto.txt).
 
 Cada cuerda puede desplazarse de su nota diatónica de fábrica en pasos de cuarto de tono
 (50 cents), independientemente de las demás. Dos usos:

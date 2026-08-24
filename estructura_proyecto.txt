@@ -1,0 +1,25 @@
+Afinador Accesible — estructura del proyecto
+============================================
+
+iniciar_afinador.py               Punto de entrada y registro de errores.
+INICIAR_AFINADOR.bat              Inicia la aplicación.
+INSTALAR_AFINADOR.bat             Crea el entorno e instala dependencias.
+README.md                         Guía breve de instalación y uso.
+DEVELOPMENT.md                    Arquitectura, reglas y pruebas.
+CLAUDE.md                         Reglas de colaboración y anclajes.
+
+app/
+  interfaz_gui.py                 Ventana principal wxPython; transición a pestañas.
+  motor_audio.py                  Captura de audio, YIN y tonos de referencia.
+  afinaciones_maqam_lira.py       Presets estáticos de lira en 24-EDO.
+  conector_nvda.py                Anuncios al lector de pantalla.
+  gestor_ajustes.py               Ajustes persistentes.
+  control_microfono.py            Desmuteo opcional de entrada Windows.
+  config_rutas.py                 Rutas del proyecto.
+
+tests/
+  test_motor_audio.py             Detección, notas, instrucciones y reproducción.
+  test_maqamat.py                 Coherencia musical de las afinaciones de lira.
+
+motor_rust/                       Aceleración opcional de captura; Python sigue siendo respaldo.
+configuraciones/                  Datos locales de la persona usuaria; no versionar.
