@@ -22,7 +22,7 @@ from app.motor_audio import (
 from app.conector_nvda import AnunciadorNVDA
 from app.control_microfono import asegurar_microfono_activo
 from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
-from app.teoria_maqam import AFINACIONES_LIRA_MAQAM_24EDO
+from app.afinaciones_maqam_lira import AFINACIONES_LIRA_MAQAM_24EDO
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,9 @@ TEXTOS_INSTRUCCION = {
     "BAJA_POCO": "Baja un poco. Ya te estás acercando",
     "BAJA_BASTANTE": "Baja bastante",
 }
+
+NOMBRES_NOTAS_BEMOLES = ["Do", "Re bemol", "Re", "Mi bemol", "Mi", "Fa", "Sol bemol", "Sol", "La bemol", "La", "Si bemol", "Si"]
+NOMBRES_NOTAS_SOSTENIDOS = ["Do", "Do sostenido", "Re", "Re sostenido", "Mi", "Fa", "Fa sostenido", "Sol", "Sol sostenido", "La", "La sostenido", "Si"]
 
 # índice de nota cromática: 0=Do, 1=Do#, 2=Re, 3=Re#, 4=Mi, 5=Fa, 6=Fa#, 7=Sol, 8=Sol#, 9=La, 10=La#, 11=Si
 CROMATICO = "Cromático (cualquier nota)"
@@ -488,7 +491,7 @@ class VentanaPrincipal(wx.Frame):
         self._guardar_ajustes_actuales()
         cuartos_tono = self._cuartos_tono_actual()
         if cuartos_tono != 0:
-            self.anunciador.hablar(self._descripcion_retoque(cuartos_tono))
+            self.anunciador.hablar(self._descripcion_objetivo_cuerda())
         evento.Skip()
 
     @staticmethod
@@ -502,6 +505,24 @@ class VentanaPrincipal(wx.Frame):
         else:
             distancia = "{} cents".format(cantidad * CENTS_POR_CUARTO_TONO)
         return "Objetivo de esta cuerda: {} {} que su afinación de fábrica.".format(distancia, direccion)
+
+    def _descripcion_objetivo_cuerda(self):
+        """Nombra el objetivo sin exigir que la persona interprete cents."""
+        cuerda_objetivo = self._cuerda_objetivo()
+        if cuerda_objetivo is None:
+            return "No hay una cuerda objetivo seleccionada."
+        _, indice_nota, octava = cuerda_objetivo
+        cuartos_tono = self._cuartos_tono_actual()
+        indice_en_cuartos = indice_nota * 2 + cuartos_tono
+        octava_objetivo = octava + indice_en_cuartos // 24
+        posicion_en_octava = indice_en_cuartos % 24
+        if posicion_en_octava % 2 == 0:
+            nombre = NOMBRES_NOTAS_BEMOLES[posicion_en_octava // 2]
+        elif cuartos_tono < 0:
+            nombre = NOMBRES_NOTAS_BEMOLES[(posicion_en_octava + 1) // 2] + " medio bemol"
+        else:
+            nombre = NOMBRES_NOTAS_SOSTENIDOS[(posicion_en_octava - 1) // 2] + " medio sostenido"
+        return "Objetivo de esta cuerda: {}{}.".format(nombre, octava_objetivo)
 
     def _cuerda_objetivo(self):
         preset = self._preset_actual()
@@ -538,7 +559,6 @@ class VentanaPrincipal(wx.Frame):
         if clave is None:
             self.anunciador.hablar("No hay ninguna cuerda seleccionada para retocar.")
             return
-        cuerda_objetivo = self._cuerda_objetivo()
         retoque_manual_previo = self.ajustes_finos_cuerdas.get(clave, 0)
         self._historial_retoques.append((clave, retoque_manual_previo))
         retoque_manual = retoque_manual_previo + delta
@@ -549,17 +569,8 @@ class VentanaPrincipal(wx.Frame):
         self._avance_ya_realizado = False
         self._historial_frecuencias.clear()
 
-        _, indice_nota, octava = cuerda_objetivo
-        cuartos_tono_totales = self._cuartos_tono_actual()
-        nota_resultante = frecuencia_a_nota(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono_totales))
-        cents_totales = cuartos_tono_totales * CENTS_POR_CUARTO_TONO
-        # No basta con decir la nota más cercana: si el retoque cae justo a mitad de camino
-        # entre dos notas (un cuarto de tono), hace falta también los cents que le faltan a
-        # esa nota más cercana para saber si se ha llegado exactamente al cuarto de tono.
         self.anunciador.hablar(
-            "Ajuste manual aplicado. Objetivo total: {:+d} cents desde la base. Ahora en {}{}, {:+.0f} cents.".format(
-                cents_totales, nota_resultante["nombre"], nota_resultante["octava"], nota_resultante["cents"]
-            )
+            "Ajuste manual aplicado. {}".format(self._descripcion_objetivo_cuerda())
         )
 
     def _al_subir_cuarto_tono(self, evento):
@@ -948,11 +959,7 @@ class VentanaPrincipal(wx.Frame):
             frecuencia = nota_a_frecuencia(9, 4)  # La4, referencia estándar en modo cromático
             self.anunciador.hablar("Referencia: La4 (440 Hz), modo cromático.")
         elif cuartos_tono != 0:
-            self.anunciador.hablar(
-                "Referencia con retoque: {:+d} cents sobre la nota de fábrica de esta cuerda.".format(
-                    cuartos_tono * CENTS_POR_CUARTO_TONO
-                )
-            )
+            self.anunciador.hablar("Referencia: {}".format(self._descripcion_objetivo_cuerda()))
         else:
             self.anunciador.hablar("Referencia: nota de fábrica de esta cuerda, sin retoque.")
 

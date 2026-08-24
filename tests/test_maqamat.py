@@ -5,7 +5,7 @@ import unittest
 
 from app.interfaz_gui import ESCALAS_POR_INSTRUMENTO, NOMBRE_LIRA, PRESETS_INSTRUMENTO
 from app.motor_audio import frecuencia_con_desplazamiento
-from app.teoria_maqam import (
+from app.afinaciones_maqam_lira import (
     AFINACIONES_LIRA_MAQAM_24EDO,
     REFERENCIAS_GRADOS_MAQAM_24EDO,
     calcular_retoques_referencia_lira,
