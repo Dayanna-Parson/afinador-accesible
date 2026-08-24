@@ -74,7 +74,7 @@ NOMBRE_UKELELE = "Ukelele"
 # de tono nuevos en el mástil, solo a otras disposiciones de acordes/resonancias.
 ESCALAS_POR_INSTRUMENTO = {
     NOMBRE_LIRA: {
-        "Diatónica de fábrica": {},
+        "Diatónica de fábrica (notas de Do mayor; comienza en Sol grave)": {},
         "Maqam Rast (sobre Sol)": {
             "Cuerda 3 (Si)": -1, "Cuerda 7 (Fa)": 1, "Cuerda 10 (Si)": -1, "Cuerda 14 (Fa)": 1,
         },
@@ -695,26 +695,14 @@ class VentanaPrincipal(wx.Frame):
             self.anunciador.hablar("No hay ninguna afinación que previsualizar en modo Cromático.")
             return
         frecuencias = []
-        cuerdas_con_retoque = 0
         for nombre_cuerda, indice_nota, octava in preset:
             clave = "{}||{}".format(instrumento, nombre_cuerda)
             cuartos_tono = self.retoques_escala_activa.get(clave, 0) + self.ajustes_finos_cuerdas.get(clave, 0)
-            if cuartos_tono != 0:
-                # Comparación A/B: primero la nota de fábrica y luego la retocada, seguidas,
-                # para notar el cuarto de tono por contraste directo en vez de tener que
-                # recordar cómo sonaba la cuerda anterior.
-                cuerdas_con_retoque += 1
-                frecuencias.append(frecuencia_con_desplazamiento(indice_nota, octava, 0))
-                frecuencias.append(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono))
-            else:
-                frecuencias.append(frecuencia_con_desplazamiento(indice_nota, octava, 0))
-        if cuerdas_con_retoque:
-            self.anunciador.hablar(
-                "Escucha previa de la escala: {} cuerdas, {} con retoque (fábrica y luego "
-                "retocada).".format(len(preset), cuerdas_con_retoque)
-            )
-        else:
-            self.anunciador.hablar("Escucha previa de la escala: {} cuerdas.".format(len(preset)))
+            frecuencias.append(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono))
+        self.anunciador.hablar(
+            "Escucha previa de la afinación objetivo: {} cuerdas, desde la más grave a la más aguda."
+            .format(len(preset))
+        )
         self.generador_tonos.reproducir_secuencia(
             frecuencias,
             al_finalizar=lambda: wx.CallAfter(self.anunciador.hablar, "Escucha previa terminada.")
