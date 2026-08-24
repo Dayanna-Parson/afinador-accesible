@@ -22,6 +22,7 @@ from app.motor_audio import (
 from app.conector_nvda import AnunciadorNVDA
 from app.control_microfono import asegurar_microfono_activo
 from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
+from app.teoria_maqam import AFINACIONES_LIRA_MAQAM_24EDO
 
 logger = logging.getLogger(__name__)
 
@@ -58,34 +59,12 @@ NOMBRE_LIRA = "Lira de 16 cuerdas (Aklot)"
 NOMBRE_GUITARRA = "Guitarra"
 NOMBRE_UKELELE = "Ukelele"
 
-# Desplazamiento en cuartos de tono (50 cents cada uno) sobre la afinación de fábrica de
-# cada instrumento, por escala/afinación. Todos los valores son múltiplos de 2 (semitonos
-# completos) salvo los maqam de la lira, que usan cuartos de tono sueltos a propósito.
-#
-# Lira: patrones verificados contra la teoría estándar de intervalos en cuartos de tono
-# (Touma, "The Music of the Arabs"): Rast sobre Sol (4,3,3,4,4,3,3 cuartos de tono desde la
-# tónica), Bayati sobre Re (3,3,4,4,2,4,4) e Hijaz sobre Re (2,6,2,4,2,4,4). Al coincidir la
-# afinación diatónica de la lira con las notas naturales, solo hace falta retocar las
-# cuerdas cuyo grado cambia respecto al maqam.
-#
 # Guitarra y ukelele: afinaciones alternativas estándar, ampliamente documentadas. En un
 # instrumento con trastes el retoque solo desplaza la cuerda al aire entera — los trastes
 # siguen fijos en semitonos occidentales, así que estas afinaciones no dan acceso a cuartos
 # de tono nuevos en el mástil, solo a otras disposiciones de acordes/resonancias.
 ESCALAS_POR_INSTRUMENTO = {
-    NOMBRE_LIRA: {
-        "Diatónica de fábrica (notas de Do mayor; comienza en Sol grave)": {},
-        "Maqam Rast (sobre Sol)": {
-            "Cuerda 3 (Si)": -1, "Cuerda 7 (Fa)": 1, "Cuerda 10 (Si)": -1, "Cuerda 14 (Fa)": 1,
-        },
-        "Maqam Bayati (sobre Re)": {
-            "Cuerda 3 (Si)": -2, "Cuerda 6 (Mi)": -1, "Cuerda 10 (Si)": -2, "Cuerda 13 (Mi)": -1,
-        },
-        "Maqam Hijaz (sobre Re)": {
-            "Cuerda 3 (Si)": -2, "Cuerda 6 (Mi)": -2, "Cuerda 7 (Fa)": 2,
-            "Cuerda 10 (Si)": -2, "Cuerda 13 (Mi)": -2, "Cuerda 14 (Fa)": 2,
-        },
-    },
+    NOMBRE_LIRA: dict(AFINACIONES_LIRA_MAQAM_24EDO),
     NOMBRE_GUITARRA: {
         "Estándar (Mi La Re Sol Si Mi)": {},
         "Drop D (Re La Re Sol Si Mi)": {"Cuerda 6 (Mi)": -4},
@@ -99,67 +78,6 @@ ESCALAS_POR_INSTRUMENTO = {
         "Estándar (Sol Do Mi La, reentrante)": {},
     },
 }
-
-# Perfiles de maqam expresados en cents desde su tónica. Se calculan sobre cada cuerda
-# natural de la lira, para que la misma teoría determine tanto la referencia como la afinación.
-MAQAMAT_ADICIONALES_LIRA = [
-    ("Maqam Rast (sobre Do)", 0, 0, (0, 200, 350, 500, 700, 900, 1050)),
-    ("Maqam Bayati (sobre Re)", 2, 0, (0, 150, 300, 500, 700, 800, 1000)),
-    ("Maqam Hijaz (sobre Re)", 2, 0, (0, 100, 400, 500, 700, 800, 1000)),
-    ("Maqam Saba (sobre Re)", 2, 0, (0, 150, 300, 400, 700, 800, 1000)),
-    ("Maqam Kurd (sobre Re)", 2, 0, (0, 100, 300, 500, 700, 800, 1000)),
-    ("Maqam Nahawand (sobre Do)", 0, 0, (0, 200, 300, 500, 700, 800, 1100)),
-    ("Maqam Ajam (sobre Si bemol)", 10, 0, (0, 200, 400, 500, 700, 900, 1100)),
-    ("Maqam Sikah (sobre Mi medio bemol)", 4, -50, (0, 150, 350, 550, 700, 850, 1050)),
-    ("Maqam Suznak (sobre Do)", 0, 0, (0, 200, 350, 500, 700, 800, 1100)),
-    ("Maqam Nikriz (sobre Do)", 0, 0, (0, 200, 300, 600, 700, 900, 1000)),
-    ("Maqam Athar Kurd (sobre Do)", 0, 0, (0, 100, 300, 600, 700, 800, 1100)),
-    ("Maqam Hijazkar (sobre Do)", 0, 0, (0, 100, 400, 500, 700, 800, 1100)),
-    ("Maqam Bayati Shuri (sobre Re)", 2, 0, (0, 150, 300, 500, 600, 900, 1000)),
-    ("Maqam Farahfaza (sobre Sol)", 7, 0, (0, 200, 300, 500, 700, 800, 1000)),
-    ("Maqam Mahur (sobre Do)", 0, 0, (0, 200, 350, 500, 700, 900, 1100)),
-    ("Maqam Awj Ara (sobre Si medio bemol)", 11, -50, (0, 150, 350, 500, 700, 850, 1000)),
-    ("Maqam Shawq Afza (sobre Do)", 0, 0, (0, 200, 400, 500, 700, 800, 1100)),
-    ("Maqam Lami (sobre Re)", 2, 0, (0, 100, 300, 500, 600, 800, 1000)),
-    ("Maqam Saba Zamzam (sobre Re)", 2, 0, (0, 100, 300, 400, 700, 800, 1000)),
-    ("Maqam Bayati Husseini (sobre Re)", 2, 0, (0, 150, 300, 500, 700, 850, 1000)),
-    ("Maqam Nayruz (sobre Do)", 0, 0, (0, 200, 350, 500, 700, 850, 1000)),
-]
-
-
-INDICES_DIATONICOS_NATURALES = {0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6}
-INDICES_DIATONICOS_TONICAS = {**INDICES_DIATONICOS_NATURALES, 10: 6}
-
-
-def _retoques_lira_para_maqam(indice_tonica, cents_tonica, grados):
-    """Calcula un grado fijo del maqam para cada nota natural de la lira.
-
-    No se elige simplemente el tono más cercano: eso puede convertir, por ejemplo, Si y
-    Do en la misma nota. Cada letra de la lira conserva su puesto diatónico dentro del
-    maqam y solo se desplaza la cantidad necesaria para llegar a ese grado.
-    """
-    frecuencia_tonica = nota_a_frecuencia(indice_tonica, 4) * (2 ** (cents_tonica / 1200))
-    indice_diatonico_tonica = INDICES_DIATONICOS_TONICAS[indice_tonica]
-    retoques = {}
-    for nombre_cuerda, indice_nota, octava in PRESETS_INSTRUMENTO[NOMBRE_LIRA]:
-        frecuencia_base = nota_a_frecuencia(indice_nota, octava)
-        indice_diatonico_cuerda = INDICES_DIATONICOS_NATURALES[indice_nota]
-        grado = (indice_diatonico_cuerda - indice_diatonico_tonica) % len(grados)
-        candidatas = [
-            frecuencia_tonica * (2 ** ((grados[grado] + 1200 * desplazamiento) / 1200))
-            for desplazamiento in range(-3, 4)
-        ]
-        frecuencia_objetivo = min(candidatas, key=lambda valor: abs(np.log2(valor / frecuencia_base)))
-        cuartos_tono = int(round(1200 * np.log2(frecuencia_objetivo / frecuencia_base) / CENTS_POR_CUARTO_TONO))
-        if cuartos_tono:
-            retoques[nombre_cuerda] = cuartos_tono
-    return retoques
-
-
-for nombre_maqam, indice_tonica, cents_tonica, grados in MAQAMAT_ADICIONALES_LIRA:
-    ESCALAS_POR_INSTRUMENTO[NOMBRE_LIRA].setdefault(
-        nombre_maqam, _retoques_lira_para_maqam(indice_tonica, cents_tonica, grados)
-    )
 
 OPCIONES_TASA_MUESTREO = [
     ("Automática (recomendada)", None),
