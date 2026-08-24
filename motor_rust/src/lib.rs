@@ -127,6 +127,7 @@ struct CapturadorYinRust {
     tasa_muestreo_deseada: Option<u32>,
     duracion_ventana: f32,
     ganancia: f32,
+    canal_entrada: Option<usize>,
     callback: Py<PyAny>,
     pausado: Arc<AtomicBool>,
     detener_analisis: Arc<AtomicBool>,
@@ -157,7 +158,7 @@ fn resolver_config_entrada(
 #[pymethods]
 impl CapturadorYinRust {
     #[new]
-    #[pyo3(signature = (callback, indice_dispositivo=None, umbral_yin=0.15, umbral_rms=0.02, tasa_muestreo_deseada=None, duracion_ventana=DURACION_VENTANA_SEGUNDOS, ganancia=1.0))]
+    #[pyo3(signature = (callback, indice_dispositivo=None, umbral_yin=0.15, umbral_rms=0.02, tasa_muestreo_deseada=None, duracion_ventana=DURACION_VENTANA_SEGUNDOS, ganancia=1.0, canal_entrada=None))]
     fn nuevo(
         callback: Py<PyAny>,
         indice_dispositivo: Option<usize>,
@@ -166,6 +167,7 @@ impl CapturadorYinRust {
         tasa_muestreo_deseada: Option<u32>,
         duracion_ventana: f32,
         ganancia: f32,
+        canal_entrada: Option<usize>,
     ) -> Self {
         CapturadorYinRust {
             indice_dispositivo,
@@ -174,6 +176,7 @@ impl CapturadorYinRust {
             tasa_muestreo_deseada,
             duracion_ventana,
             ganancia,
+            canal_entrada,
             callback,
             pausado: Arc::new(AtomicBool::new(false)),
             detener_analisis: Arc::new(AtomicBool::new(false)),
@@ -205,6 +208,11 @@ impl CapturadorYinRust {
 
         let tasa_muestreo = config.sample_rate().0 as f32;
         let canales = config.channels() as usize;
+        if let Some(canal) = self.canal_entrada {
+            if canal >= canales {
+                return Err(PyRuntimeError::new_err("el canal de entrada seleccionado no existe en este dispositivo"));
+            }
+        }
         let formato_muestra = config.sample_format();
         let tamano_ventana = ((tasa_muestreo * self.duracion_ventana) as usize).max(1024);
 
@@ -213,6 +221,7 @@ impl CapturadorYinRust {
         let (tx_arranque, rx_arranque) = std::sync::mpsc::channel::<Result<(), String>>();
         let pausado_audio = Arc::clone(&self.pausado);
         let ganancia_audio = self.ganancia;
+        let canal_entrada_audio = self.canal_entrada;
 
         let stream_config: cpal::StreamConfig = config.into();
         let err_fn = |error| eprintln!("error en el flujo de entrada de audio: {error}");
@@ -233,7 +242,13 @@ impl CapturadorYinRust {
                         // aplicaciones.
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| (marco.iter().sum::<f32>() / marco.len() as f32 * ganancia_audio).clamp(-1.0, 1.0))
+                            .map(|marco| {
+                                let muestra = match canal_entrada_audio {
+                                    Some(indice) => marco[indice],
+                                    None => marco.iter().sum::<f32>() / marco.len() as f32,
+                                };
+                                (muestra * ganancia_audio).clamp(-1.0, 1.0)
+                            })
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
@@ -249,8 +264,11 @@ impl CapturadorYinRust {
                         let mono: Vec<f32> = datos
                             .chunks(canales)
                             .map(|marco| {
-                                let promedio = marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32;
-                                (promedio * ganancia_audio).clamp(-1.0, 1.0)
+                                let muestra = match canal_entrada_audio {
+                                    Some(indice) => marco[indice].to_float_sample(),
+                                    None => marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32,
+                                };
+                                (muestra * ganancia_audio).clamp(-1.0, 1.0)
                             })
                             .collect();
                         let _ = tx_muestras.try_send(mono);
@@ -267,8 +285,11 @@ impl CapturadorYinRust {
                         let mono: Vec<f32> = datos
                             .chunks(canales)
                             .map(|marco| {
-                                let promedio = marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32;
-                                (promedio * ganancia_audio).clamp(-1.0, 1.0)
+                                let muestra = match canal_entrada_audio {
+                                    Some(indice) => marco[indice].to_float_sample(),
+                                    None => marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32,
+                                };
+                                (muestra * ganancia_audio).clamp(-1.0, 1.0)
                             })
                             .collect();
                         let _ = tx_muestras.try_send(mono);
@@ -285,8 +306,11 @@ impl CapturadorYinRust {
                         let mono: Vec<f32> = datos
                             .chunks(canales)
                             .map(|marco| {
-                                let promedio = marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32;
-                                (promedio * ganancia_audio).clamp(-1.0, 1.0)
+                                let muestra = match canal_entrada_audio {
+                                    Some(indice) => marco[indice].to_float_sample(),
+                                    None => marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32,
+                                };
+                                (muestra * ganancia_audio).clamp(-1.0, 1.0)
                             })
                             .collect();
                         let _ = tx_muestras.try_send(mono);
@@ -303,8 +327,11 @@ impl CapturadorYinRust {
                         let mono: Vec<f32> = datos
                             .chunks(canales)
                             .map(|marco| {
-                                let promedio = marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32;
-                                (promedio * ganancia_audio).clamp(-1.0, 1.0)
+                                let muestra = match canal_entrada_audio {
+                                    Some(indice) => marco[indice].to_float_sample(),
+                                    None => marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32,
+                                };
+                                (muestra * ganancia_audio).clamp(-1.0, 1.0)
                             })
                             .collect();
                         let _ = tx_muestras.try_send(mono);

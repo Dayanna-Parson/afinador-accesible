@@ -27,6 +27,17 @@ NOMBRES_NOTAS = ["Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La
 INDICE_LA = 9
 
 
+def establecer_frecuencia_la4(frecuencia):
+    """Establece la referencia de concierto global usada por notas y tonos."""
+    global FRECUENCIA_LA4
+    FRECUENCIA_LA4 = float(frecuencia)
+
+
+def obtener_frecuencia_la4():
+    """Devuelve la referencia de concierto activa en hercios."""
+    return FRECUENCIA_LA4
+
+
 def listar_dispositivos_entrada():
     """Devuelve los dispositivos de audio con al menos un canal de entrada disponible.
 
@@ -184,7 +195,7 @@ class _CapturadorYINPuroPython:
 
     def __init__(self, indice_dispositivo=None, tasa_muestreo=None, duracion_ventana=0.1,
                  umbral_yin=0.15, umbral_rms=0.02, al_detectar=None, preferir_exclusivo_wasapi=False,
-                 ganancia=1.0):
+                 ganancia=1.0, canal_entrada=None):
         self.indice_dispositivo = indice_dispositivo
         self.tasa_muestreo = tasa_muestreo or self._tasa_muestreo_defecto(indice_dispositivo)
         self.canales = self._canales_defecto(indice_dispositivo)
@@ -195,6 +206,7 @@ class _CapturadorYINPuroPython:
         self.al_detectar = al_detectar
         self.preferir_exclusivo_wasapi = preferir_exclusivo_wasapi
         self.ganancia = ganancia
+        self.canal_entrada = canal_entrada
 
         self._flujo = None
         self._cola = queue.Queue(maxsize=2)
@@ -229,7 +241,10 @@ class _CapturadorYINPuroPython:
             logger.warning("estado del flujo de entrada de audio: %s", estado)
         if self._pausado.is_set():
             return
-        mono = indata.mean(axis=1) if indata.shape[1] > 1 else indata[:, 0]
+        if self.canal_entrada is not None:
+            mono = indata[:, self.canal_entrada]
+        else:
+            mono = indata.mean(axis=1) if indata.shape[1] > 1 else indata[:, 0]
         if self.ganancia != 1.0:
             mono = np.clip(mono * self.ganancia, -1.0, 1.0)
         try:
@@ -271,6 +286,11 @@ class _CapturadorYINPuroPython:
         self._pausado.clear()
         self._hilo_analisis = threading.Thread(target=self._bucle_analisis, daemon=True)
         self._hilo_analisis.start()
+        if self.canal_entrada is not None and self.canal_entrada >= self.canales:
+            self._detener.set()
+            self._hilo_analisis.join(timeout=1.0)
+            self._hilo_analisis = None
+            raise ValueError("el canal de entrada seleccionado no existe en este dispositivo")
         argumentos_flujo = dict(
             device=self.indice_dispositivo,
             channels=self.canales,
@@ -347,13 +367,13 @@ class CapturadorYIN:
 
     def __init__(self, indice_dispositivo=None, tasa_muestreo=None, duracion_ventana=0.1,
                  umbral_yin=0.15, umbral_rms=0.02, al_detectar=None, preferir_exclusivo_wasapi=False,
-                 ganancia=1.0):
+                 ganancia=1.0, canal_entrada=None):
         self.al_detectar = al_detectar
         if _RUST_DISPONIBLE:
             self._backend = "rust"
             self._nucleo = _motor_rust.CapturadorYinRust(
                 self._al_detectar_rust, indice_dispositivo, umbral_yin, umbral_rms,
-                tasa_muestreo, duracion_ventana, ganancia,
+                tasa_muestreo, duracion_ventana, ganancia, canal_entrada,
             )
         else:
             self._backend = "python"
@@ -366,6 +386,7 @@ class CapturadorYIN:
                 al_detectar=al_detectar,
                 preferir_exclusivo_wasapi=preferir_exclusivo_wasapi,
                 ganancia=ganancia,
+                canal_entrada=canal_entrada,
             )
 
     @property
@@ -402,6 +423,34 @@ class GeneradorTonos:
         self.tasa_muestreo = tasa_muestreo
         self._hilo_reproduccion = None
         self._detener_bucle = threading.Event()
+        self._bloqueo_reproduccion = threading.Lock()
+        self._identificador_reproduccion = 0
+
+    def _iniciar_reproduccion(self):
+        """Invalida cualquier reproducción anterior y devuelve su nuevo identificador.
+
+        sounddevice reproduce un único flujo global: serializarlo evita que una escucha
+        previa, una referencia y un pitido de confirmación se corten o reanuden la captura
+        fuera de orden.
+        """
+        with self._bloqueo_reproduccion:
+            self._identificador_reproduccion += 1
+            self._detener_bucle.set()
+            return self._identificador_reproduccion
+
+    def _es_reproduccion_actual(self, identificador):
+        with self._bloqueo_reproduccion:
+            return identificador == self._identificador_reproduccion
+
+    def _finalizar_reproduccion(self, identificador, al_finalizar=None):
+        """Reanuda la captura solo si esta reproducción sigue siendo la activa."""
+        with self._bloqueo_reproduccion:
+            if identificador != self._identificador_reproduccion:
+                return
+            if self.capturador is not None:
+                self.capturador.reanudar()
+        if al_finalizar:
+            al_finalizar()
 
     @staticmethod
     def _compensar_percepcion_grave(frecuencia, amplitud):
@@ -435,36 +484,36 @@ class GeneradorTonos:
             onda *= envolvente
         return onda.astype(np.float32)
 
-    def _reproducir_bloqueante(self, frecuencia, duracion, amplitud, al_finalizar):
+    def _reproducir_bloqueante(self, frecuencia, duracion, amplitud, al_finalizar, identificador):
         if self.capturador is not None:
             self.capturador.pausar()
         try:
+            if not self._es_reproduccion_actual(identificador):
+                return
             onda = self._generar_onda(frecuencia, duracion, amplitud)
             sd.play(onda, samplerate=self.tasa_muestreo, blocking=True)
         except Exception:
             logger.exception("fallo al reproducir el tono de referencia")
         finally:
-            if self.capturador is not None:
-                self.capturador.reanudar()
-            if al_finalizar:
-                al_finalizar()
+            self._finalizar_reproduccion(identificador, al_finalizar)
 
     def reproducir(self, frecuencia, duracion=2.0, amplitud=0.45, al_finalizar=None):
         """Reproduce el tono en un hilo secundario, pausando la captura mientras suena."""
-        self._detener_bucle.set()
+        identificador = self._iniciar_reproduccion()
+        sd.stop()
         self._hilo_reproduccion = threading.Thread(
             target=self._reproducir_bloqueante,
-            args=(frecuencia, duracion, amplitud, al_finalizar),
+            args=(frecuencia, duracion, amplitud, al_finalizar, identificador),
             daemon=True,
         )
         self._hilo_reproduccion.start()
 
-    def _reproducir_en_bucle(self, frecuencia, duracion, pausa, amplitud):
+    def _reproducir_en_bucle(self, frecuencia, duracion, pausa, amplitud, identificador):
         if self.capturador is not None:
             self.capturador.pausar()
         try:
             onda = self._generar_onda(frecuencia, duracion, amplitud)
-            while not self._detener_bucle.is_set():
+            while self._es_reproduccion_actual(identificador) and not self._detener_bucle.is_set():
                 sd.play(onda, samplerate=self.tasa_muestreo, blocking=True)
                 if self._detener_bucle.wait(timeout=pausa):
                     break
@@ -472,31 +521,31 @@ class GeneradorTonos:
             logger.exception("fallo al reproducir el tono de referencia en bucle")
         finally:
             sd.stop()
-            if self.capturador is not None:
-                self.capturador.reanudar()
+            self._finalizar_reproduccion(identificador)
 
     def reproducir_en_bucle(self, frecuencia, duracion=1.2, pausa=0.4, amplitud=0.45):
         """Repite el tono de referencia indefinidamente hasta llamar a detener_bucle()."""
+        identificador = self._iniciar_reproduccion()
         self._detener_bucle.clear()
+        sd.stop()
         self._hilo_reproduccion = threading.Thread(
             target=self._reproducir_en_bucle,
-            args=(frecuencia, duracion, pausa, amplitud),
+            args=(frecuencia, duracion, pausa, amplitud, identificador),
             daemon=True,
         )
         self._hilo_reproduccion.start()
 
     def detener_bucle(self):
-        self._detener_bucle.set()
+        identificador = self._iniciar_reproduccion()
         sd.stop()
-        if self.capturador is not None:
-            self.capturador.reanudar()
+        self._finalizar_reproduccion(identificador)
 
-    def _reproducir_secuencia(self, frecuencias, duracion, pausa, amplitud, al_finalizar):
+    def _reproducir_secuencia(self, frecuencias, duracion, pausa, amplitud, al_finalizar, identificador):
         if self.capturador is not None:
             self.capturador.pausar()
         try:
             for frecuencia in frecuencias:
-                if self._detener_bucle.is_set():
+                if not self._es_reproduccion_actual(identificador) or self._detener_bucle.is_set():
                     break
                 onda = self._generar_onda(frecuencia, duracion, amplitud)
                 sd.play(onda, samplerate=self.tasa_muestreo, blocking=True)
@@ -506,20 +555,19 @@ class GeneradorTonos:
             logger.exception("fallo al reproducir la escucha previa de la escala")
         finally:
             sd.stop()
-            if self.capturador is not None:
-                self.capturador.reanudar()
-            if al_finalizar:
-                al_finalizar()
+            self._finalizar_reproduccion(identificador, al_finalizar)
 
     def reproducir_secuencia(self, frecuencias, duracion=0.6, pausa=0.15, amplitud=0.45, al_finalizar=None):
         """Reproduce una lista de frecuencias en orden, una sola vez (escucha previa de escala).
 
         Se puede interrumpir a mitad con detener_bucle(), igual que reproducir_en_bucle().
         """
+        identificador = self._iniciar_reproduccion()
         self._detener_bucle.clear()
+        sd.stop()
         self._hilo_reproduccion = threading.Thread(
             target=self._reproducir_secuencia,
-            args=(frecuencias, duracion, pausa, amplitud, al_finalizar),
+            args=(frecuencias, duracion, pausa, amplitud, al_finalizar, identificador),
             daemon=True,
         )
         self._hilo_reproduccion.start()

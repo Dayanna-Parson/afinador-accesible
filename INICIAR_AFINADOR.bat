@@ -4,7 +4,11 @@ cls
 echo ---------------------------------------------------
 echo    INICIANDO AFINADOR ACCESIBLE...
 echo ---------------------------------------------------
-python iniciar_afinador.py
+if exist ".venv\Scripts\python.exe" (
+    ".venv\Scripts\python.exe" iniciar_afinador.py
+) else (
+    python iniciar_afinador.py
+)
 echo.
 echo ---------------------------------------------------
 echo    PROGRAMA CERRADO O FINALIZADO
