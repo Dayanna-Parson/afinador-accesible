@@ -28,6 +28,7 @@ AJUSTES_POR_DEFECTO = {
     "deteccion_automatica_cuerda": False,
     "instrucciones_detalladas": False,
     "umbral_yin": 0.15,
+    "escala": None,
     "ajustes_finos_cuerdas": {},
 }
 

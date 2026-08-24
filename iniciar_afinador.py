@@ -2,6 +2,8 @@
 
 import logging
 import os
+import sys
+import threading
 from logging.handlers import RotatingFileHandler
 
 import wx
@@ -25,8 +27,19 @@ def _configurar_logging():
     )
 
 
+def _registrar_excepcion_no_controlada(tipo, valor, traza):
+    """Conserva el detalle de un cierre inesperado en afinador.log."""
+    logging.getLogger(__name__).critical("cierre inesperado de la aplicación", exc_info=(tipo, valor, traza))
+
+
+def _registrar_excepcion_hilo(argumentos):
+    _registrar_excepcion_no_controlada(argumentos.exc_type, argumentos.exc_value, argumentos.exc_traceback)
+
+
 def main():
     _configurar_logging()
+    sys.excepthook = _registrar_excepcion_no_controlada
+    threading.excepthook = _registrar_excepcion_hilo
     aplicacion = wx.App(False)
     VentanaPrincipal()
     aplicacion.MainLoop()

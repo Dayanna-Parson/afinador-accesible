@@ -127,15 +127,27 @@ MAQAMAT_ADICIONALES_LIRA = [
 ]
 
 
+INDICES_DIATONICOS_NATURALES = {0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6}
+INDICES_DIATONICOS_TONICAS = {**INDICES_DIATONICOS_NATURALES, 10: 6}
+
+
 def _retoques_lira_para_maqam(indice_tonica, cents_tonica, grados):
-    """Calcula el retoque de cada cuerda de la lira hacia la nota del maqam más cercana."""
+    """Calcula un grado fijo del maqam para cada nota natural de la lira.
+
+    No se elige simplemente el tono más cercano: eso puede convertir, por ejemplo, Si y
+    Do en la misma nota. Cada letra de la lira conserva su puesto diatónico dentro del
+    maqam y solo se desplaza la cantidad necesaria para llegar a ese grado.
+    """
     frecuencia_tonica = nota_a_frecuencia(indice_tonica, 4) * (2 ** (cents_tonica / 1200))
+    indice_diatonico_tonica = INDICES_DIATONICOS_TONICAS[indice_tonica]
     retoques = {}
     for nombre_cuerda, indice_nota, octava in PRESETS_INSTRUMENTO[NOMBRE_LIRA]:
         frecuencia_base = nota_a_frecuencia(indice_nota, octava)
+        indice_diatonico_cuerda = INDICES_DIATONICOS_NATURALES[indice_nota]
+        grado = (indice_diatonico_cuerda - indice_diatonico_tonica) % len(grados)
         candidatas = [
-            frecuencia_tonica * (2 ** ((grado + 1200 * desplazamiento) / 1200))
-            for grado in grados for desplazamiento in range(-3, 4)
+            frecuencia_tonica * (2 ** ((grados[grado] + 1200 * desplazamiento) / 1200))
+            for desplazamiento in range(-3, 4)
         ]
         frecuencia_objetivo = min(candidatas, key=lambda valor: abs(np.log2(valor / frecuencia_base)))
         cuartos_tono = int(round(1200 * np.log2(frecuencia_objetivo / frecuencia_base) / CENTS_POR_CUARTO_TONO))
@@ -189,6 +201,7 @@ class VentanaPrincipal(wx.Frame):
         self.ajustes = cargar_ajustes()
         establecer_frecuencia_la4(float(self.ajustes.get("frecuencia_la4", 440.0)))
         self.ajustes_finos_cuerdas = dict(self.ajustes.get("ajustes_finos_cuerdas", {}))
+        self.retoques_escala_activa = {}
         self._historial_retoques = []
         self.anunciador = AnunciadorNVDA()
         self.capturador = None
@@ -446,6 +459,11 @@ class VentanaPrincipal(wx.Frame):
             if posicion_cuerda != wx.NOT_FOUND:
                 self.selector_cuerda.SetSelection(posicion_cuerda)
 
+        nombre_escala = self.ajustes.get("escala")
+        if nombre_escala and self.selector_escala.FindString(nombre_escala) != wx.NOT_FOUND:
+            self.selector_escala.SetStringSelection(nombre_escala)
+        self._aplicar_retoques_escala_activa()
+
     def _guardar_ajustes_actuales(self):
         posicion_dispositivo = self.selector_dispositivo.GetSelection()
         nombre_dispositivo = (
@@ -471,6 +489,7 @@ class VentanaPrincipal(wx.Frame):
             "modo_solo_escucha": self.casilla_modo_solo_escucha.GetValue(),
             "deteccion_automatica_cuerda": self.casilla_deteccion_automatica_cuerda.GetValue(),
             "instrucciones_detalladas": self.selector_verbosidad.GetSelection() == 1,
+            "escala": self.selector_escala.GetStringSelection() or None,
             "ajustes_finos_cuerdas": self.ajustes_finos_cuerdas,
         })
         guardar_ajustes(self.ajustes)
@@ -525,22 +544,24 @@ class VentanaPrincipal(wx.Frame):
             evento.Skip()
 
     def _al_cambiar_escala(self, evento):
-        instrumento = self.selector_instrumento.GetStringSelection()
-        nombre_escala = self.selector_escala.GetStringSelection()
-        desplazamientos = ESCALAS_POR_INSTRUMENTO.get(instrumento, {}).get(nombre_escala, {})
-        for nombre_cuerda, _, _ in PRESETS_INSTRUMENTO.get(instrumento) or []:
-            clave = "{}||{}".format(instrumento, nombre_cuerda)
-            if nombre_cuerda in desplazamientos:
-                self.ajustes_finos_cuerdas[clave] = desplazamientos[nombre_cuerda]
-            else:
-                self.ajustes_finos_cuerdas.pop(clave, None)
+        self._aplicar_retoques_escala_activa()
         self._guardar_ajustes_actuales()
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._historial_frecuencias.clear()
-        self.anunciador.hablar("Escala aplicada: {}.".format(nombre_escala))
+        self.anunciador.hablar("Escala aplicada: {}.".format(self.selector_escala.GetStringSelection()))
         evento.Skip()
+
+    def _aplicar_retoques_escala_activa(self):
+        """Carga los retoques propios de la escala sin alterar los retoques manuales."""
+        instrumento = self.selector_instrumento.GetStringSelection()
+        nombre_escala = self.selector_escala.GetStringSelection()
+        desplazamientos = ESCALAS_POR_INSTRUMENTO.get(instrumento, {}).get(nombre_escala, {})
+        self.retoques_escala_activa = {
+            "{}||{}".format(instrumento, nombre_cuerda): cuartos_tono
+            for nombre_cuerda, cuartos_tono in desplazamientos.items()
+        }
 
     def _al_cambiar_cuerda(self, evento):
         self.anunciador.reiniciar_estado()
@@ -583,7 +604,7 @@ class VentanaPrincipal(wx.Frame):
         clave = self._clave_ajuste_fino()
         if clave is None:
             return 0
-        return self.ajustes_finos_cuerdas.get(clave, 0)
+        return self.retoques_escala_activa.get(clave, 0) + self.ajustes_finos_cuerdas.get(clave, 0)
 
     def _frecuencia_objetivo_actual(self):
         """Frecuencia real de la cuerda seleccionada, incluyendo el retoque fino en cuartos
@@ -600,10 +621,10 @@ class VentanaPrincipal(wx.Frame):
             self.anunciador.hablar("No hay ninguna cuerda seleccionada para retocar.")
             return
         cuerda_objetivo = self._cuerda_objetivo()
-        cuartos_tono_previo = self.ajustes_finos_cuerdas.get(clave, 0)
-        self._historial_retoques.append((clave, cuartos_tono_previo))
-        cuartos_tono = cuartos_tono_previo + delta
-        self.ajustes_finos_cuerdas[clave] = cuartos_tono
+        retoque_manual_previo = self.ajustes_finos_cuerdas.get(clave, 0)
+        self._historial_retoques.append((clave, retoque_manual_previo))
+        retoque_manual = retoque_manual_previo + delta
+        self.ajustes_finos_cuerdas[clave] = retoque_manual
         self._guardar_ajustes_actuales()
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
@@ -611,13 +632,14 @@ class VentanaPrincipal(wx.Frame):
         self._historial_frecuencias.clear()
 
         _, indice_nota, octava = cuerda_objetivo
-        nota_resultante = frecuencia_a_nota(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono))
-        cents_totales = cuartos_tono * CENTS_POR_CUARTO_TONO
+        cuartos_tono_totales = self._cuartos_tono_actual()
+        nota_resultante = frecuencia_a_nota(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono_totales))
+        cents_totales = cuartos_tono_totales * CENTS_POR_CUARTO_TONO
         # No basta con decir la nota más cercana: si el retoque cae justo a mitad de camino
         # entre dos notas (un cuarto de tono), hace falta también los cents que le faltan a
         # esa nota más cercana para saber si se ha llegado exactamente al cuarto de tono.
         self.anunciador.hablar(
-            "Retoque: {:+d} cents desde la base. Ahora en {}{}, {:+.0f} cents.".format(
+            "Ajuste manual aplicado. Objetivo total: {:+d} cents desde la base. Ahora en {}{}, {:+.0f} cents.".format(
                 cents_totales, nota_resultante["nombre"], nota_resultante["octava"], nota_resultante["cents"]
             )
         )
@@ -631,7 +653,7 @@ class VentanaPrincipal(wx.Frame):
     def _al_restablecer_ajuste_fino(self, evento):
         clave = self._clave_ajuste_fino()
         if clave is None or clave not in self.ajustes_finos_cuerdas:
-            self.anunciador.hablar("Esta cuerda no tiene ningún retoque que restablecer.")
+            self.anunciador.hablar("Esta cuerda no tiene ningún ajuste manual que restablecer.")
             return
         del self.ajustes_finos_cuerdas[clave]
         self._guardar_ajustes_actuales()
@@ -639,7 +661,7 @@ class VentanaPrincipal(wx.Frame):
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._historial_frecuencias.clear()
-        self.anunciador.hablar("Retoque restablecido.")
+        self.anunciador.hablar("Ajuste manual restablecido. La escala seleccionada se mantiene.")
 
     def _al_deshacer_retoque(self, evento):
         if not self._historial_retoques:
@@ -676,7 +698,7 @@ class VentanaPrincipal(wx.Frame):
         cuerdas_con_retoque = 0
         for nombre_cuerda, indice_nota, octava in preset:
             clave = "{}||{}".format(instrumento, nombre_cuerda)
-            cuartos_tono = self.ajustes_finos_cuerdas.get(clave, 0)
+            cuartos_tono = self.retoques_escala_activa.get(clave, 0) + self.ajustes_finos_cuerdas.get(clave, 0)
             if cuartos_tono != 0:
                 # Comparación A/B: primero la nota de fábrica y luego la retocada, seguidas,
                 # para notar el cuarto de tono por contraste directo en vez de tener que
@@ -864,7 +886,7 @@ class VentanaPrincipal(wx.Frame):
         mejor_diferencia = None
         for indice, (nombre_cuerda, indice_nota, octava) in enumerate(preset):
             clave = "{}||{}".format(instrumento, nombre_cuerda)
-            cuartos_tono = self.ajustes_finos_cuerdas.get(clave, 0)
+            cuartos_tono = self.retoques_escala_activa.get(clave, 0) + self.ajustes_finos_cuerdas.get(clave, 0)
             frecuencia_cuerda = frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono)
             diferencia = abs(1200 * np.log2(frecuencia_filtrada / frecuencia_cuerda))
             if mejor_diferencia is None or diferencia < mejor_diferencia:
