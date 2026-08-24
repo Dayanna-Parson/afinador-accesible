@@ -5,6 +5,11 @@ import unittest
 
 from app.interfaz_gui import ESCALAS_POR_INSTRUMENTO, NOMBRE_LIRA, PRESETS_INSTRUMENTO
 from app.motor_audio import frecuencia_con_desplazamiento
+from app.teoria_maqam import (
+    AFINACIONES_LIRA_MAQAM_24EDO,
+    REFERENCIAS_GRADOS_MAQAM_24EDO,
+    calcular_retoques_referencia_lira,
+)
 
 
 class PruebasMaqamatLira(unittest.TestCase):
@@ -26,3 +31,10 @@ class PruebasMaqamatLira(unittest.TestCase):
                         nombre_maqam, cuerdas[posicion][0], cuerdas[posicion + 1][0]
                     ),
                 )
+
+    def test_cada_afinacion_coincide_con_sus_siete_grados_de_referencia(self):
+        cuerdas = PRESETS_INSTRUMENTO[NOMBRE_LIRA]
+        for nombre_maqam, (tonica, cents_tonica, grados) in REFERENCIAS_GRADOS_MAQAM_24EDO.items():
+            with self.subTest(maqam=nombre_maqam):
+                esperado = calcular_retoques_referencia_lira(cuerdas, tonica, cents_tonica, grados)
+                self.assertEqual(AFINACIONES_LIRA_MAQAM_24EDO[nombre_maqam], esperado)
