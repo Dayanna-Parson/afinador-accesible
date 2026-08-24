@@ -82,8 +82,8 @@ app/
 ├── interfaz_gui.py     # VentanaPrincipal: wx.Frame raíz, presets de instrumento, flujo de captura
 ├── gestor_ajustes.py    # cargar_ajustes()/guardar_ajustes(): persistencia atómica en
 │                        # configuraciones/ajustes.json
-├── control_microfono.py # asegurar_microfono_activo(): desmute automático a nivel de
-│                        # Windows con pycaw, opcional y con fallo silencioso
+├── control_microfono.py # asegurar_microfono_activo(): desmute opcional a nivel de
+│                        # Windows con pycaw, solo con consentimiento de la usuaria
 └── config_rutas.py      # RAIZ, RUTA_CONFIGURACIONES, RUTA_AJUSTES (rutas absolutas)
 motor_rust/
 ├── Cargo.toml
@@ -95,6 +95,7 @@ tests/
 iniciar_afinador.py        # Punto de entrada, configura logging a afinador.log
 requisitos.txt             # Dependencias de Python
 INICIAR_AFINADOR.bat        # Lanzador para Windows
+INSTALAR_AFINADOR.bat       # Instalador de dependencias y compilación opcional de Rust
 ```
 
 ---
@@ -189,6 +190,7 @@ Todos declarados en una única `wx.AcceleratorTable` a nivel de `wx.Frame`
 | `Ctrl+Mayús+R` | Restablecer el retoque de la cuerda seleccionada |
 | `Ctrl+Mayús+Z` | Deshacer el último retoque en cuartos de tono (cualquier cuerda, vía `self._historial_retoques`) |
 | `Ctrl+Mayús+P` | Escucha previa de toda la escala/afinación activa (`GeneradorTonos.reproducir_secuencia`) |
+| `Ctrl+Mayús+V` | Repetir la última instrucción de afinación anunciada |
 
 Prohibido usar `Espacio` como atajo: es la tecla con la que NVDA activa controles con foco, y un atajo global en Espacio compite con eso. Si se añaden más atajos, mantenerlos todos en la misma tabla central del frame — no dupliques el mismo atajo en un panel hijo y en el frame a la vez, o la ambigüedad puede disparar el manejador equivocado.
 

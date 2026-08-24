@@ -25,6 +25,9 @@ python iniciar_afinador.py
 ```
 
 En Windows también puedes ejecutar `INICIAR_AFINADOR.bat` una vez instalados los requisitos.
+Para instalarlo todo de una vez en un entorno propio de la aplicación, ejecuta
+`INSTALAR_AFINADOR.bat`. El instalador ofrece compilar el motor opcional de Rust si ya está
+instalado el toolchain correspondiente; no es necesario para usar el afinador.
 
 ### Extensión nativa opcional (Rust)
 
@@ -60,6 +63,7 @@ python iniciar_afinador.py
   solo la seleccionada).
 - `Ctrl+Mayús+P`: escucha previa de toda la escala/afinación activa, cuerda por cuerda en
   orden, con los retoques aplicados (comparación A/B en las cuerdas retocadas).
+- `Ctrl+Mayús+V`: repetir la última instrucción de afinación anunciada.
 
 ## Retoque fino por cuerda (cuartos de tono)
 
@@ -83,8 +87,8 @@ de golpe los retoques correspondientes sobre la afinación de fábrica.
 
 ### Lira: maqam árabe (cuartos de tono)
 
-- **Maqam Rast (sobre Sol)**: la cuerda de Si baja medio tono y la de Fa sube medio tono
-  (cuarto de tono cada una), en todas las octavas.
+- **Maqam Rast (sobre Sol)**: la cuerda de Si baja un cuarto de tono y la de Fa sube un
+  cuarto de tono, en todas las octavas.
 - **Maqam Bayati (sobre Re)**: la cuerda de Si baja un semitono completo y la de Mi baja
   medio tono.
 - **Maqam Hijaz (sobre Re)**: la cuerda de Si baja un semitono, la de Mi baja un semitono
@@ -94,14 +98,15 @@ Patrones verificados contra la teoría estándar de intervalos en cuartos de ton
 
 ### Guitarra: afinaciones alternativas estándar
 
-Drop D, Open G, Open D y DADGAD — todas verificadas nota por nota contra sus afinaciones
-de referencia reales.
+Drop D, Open G, Open D y DADGAD — todas bajan o mantienen la tensión de las cuerdas estándar,
+por lo que resultan opciones razonables tanto para guitarra acústica como electroclásica.
+No se incluyen afinaciones que suben varias cuerdas y pueden aumentar demasiado la tensión.
 
-### Ukelele: afinaciones alternativas estándar
+### Ukelele soprano
 
-Sol grave (Low G, sin reentrancia, la cuerda de Sol baja una octava en vez de ser la más
-aguda) y la afinación Re tradicional (todas las cuerdas un tono entero por encima de la
-afinación estándar, común en partituras hawaianas antiguas).
+Con cuerdas normales, la aplicación mantiene únicamente la afinación estándar Sol–Do–Mi–La.
+Low G requiere montar una cuerda específica y la afinación Re requiere un juego preparado para
+esa tensión; por seguridad no se muestran como opciones de este instrumento.
 
 En instrumentos con trastes (guitarra, ukelele) estas afinaciones solo desplazan la cuerda
 al aire entera: los trastes siguen fijos en semitonos occidentales, así que no dan acceso a
@@ -142,14 +147,14 @@ razonablemente cercana (55 cents), para no saltar con ruido o armónicos ambiguo
 ## Nivel de detalle de las instrucciones
 
 El selector "Nivel de detalle de las instrucciones" tiene dos opciones: "Conciso" (la
-instrucción sola, p. ej. "Sube un poco") y "Detallado", que añade los cents exactos de
-desviación (p. ej. "Sube un poco (+18 cents)").
+instrucción y la nota detectada, p. ej. "Sube un poco" y "Sol4") y "Detallado", que añade
+los cents exactos de desviación (p. ej. "Sube un poco (+18 cents)").
 
 ## Ajustes persistentes
 
-El dispositivo de entrada, la tasa de muestreo, el tamaño de búfer, el instrumento y la
-cuerda seleccionados se guardan automáticamente en `configuraciones/ajustes.json` y se
-restauran al volver a abrir la aplicación.
+El dispositivo de entrada, la tasa de muestreo, el tamaño de búfer, el instrumento, la
+cuerda seleccionada y las opciones de accesibilidad se guardan automáticamente en
+`configuraciones/ajustes.json` y se restauran al volver a abrir la aplicación.
 
 ## Diagnóstico de nivel de entrada
 
@@ -158,9 +163,9 @@ micrófono, para comprobar visualmente si hay señal. Si tras iniciar la escucha
 detecta ninguna señal en unos segundos, la app lo anuncia por voz (puede indicar que el
 dispositivo seleccionado no es el correcto, o que está silenciado a nivel de Windows).
 
-En Windows, al iniciar la escucha también se comprueba automáticamente si el micrófono
-seleccionado está silenciado a nivel de sistema y, si lo está, se desmutea solo (requiere
-`pycaw`, instalado por defecto en Windows vía `requisitos.txt`).
+La opción "Desmutear el micrófono si Windows lo tiene silenciado" está desactivada por
+defecto. Al activarla, la aplicación puede desmutear el dispositivo seleccionado antes de
+iniciar la escucha (requiere `pycaw`, instalado por defecto en Windows vía `requisitos.txt`).
 
 ## Avance automático de cuerda
 

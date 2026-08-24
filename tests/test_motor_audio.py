@@ -14,6 +14,7 @@ from app.motor_audio import (
     calcular_instruccion,
     estimar_frecuencia_yin,
     frecuencia_a_nota,
+    GeneradorTonos,
     nota_a_frecuencia,
 )
 
@@ -134,6 +135,28 @@ class PruebasCalculoInstruccion(unittest.TestCase):
 
     def test_valor_none(self):
         self.assertIsNone(calcular_instruccion(None))
+
+
+class _CapturadorDePrueba:
+    def __init__(self):
+        self.reanudaciones = 0
+
+    def reanudar(self):
+        self.reanudaciones += 1
+
+
+class PruebasCoordinacionDeReproduccion(unittest.TestCase):
+    def test_reproduccion_anterior_no_reanuda_la_captura_nueva(self):
+        capturador = _CapturadorDePrueba()
+        generador = GeneradorTonos(capturador=capturador)
+        identificador_anterior = generador._iniciar_reproduccion()
+        identificador_actual = generador._iniciar_reproduccion()
+
+        generador._finalizar_reproduccion(identificador_anterior)
+        self.assertEqual(capturador.reanudaciones, 0)
+
+        generador._finalizar_reproduccion(identificador_actual)
+        self.assertEqual(capturador.reanudaciones, 1)
 
 
 if __name__ == "__main__":

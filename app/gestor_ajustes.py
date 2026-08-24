@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 AJUSTES_POR_DEFECTO = {
     "nombre_dispositivo": None,
+    "frecuencia_la4": 440.0,
+    "canal_entrada": None,
+    "pitido_confirmacion": True,
     "instrumento": None,
     "cuerda": None,
     "tasa_muestreo": None,
@@ -17,6 +20,7 @@ AJUSTES_POR_DEFECTO = {
     "umbral_yin": 0.15,
     "umbral_rms": 0.02,
     "preferir_exclusivo_wasapi": False,
+    "desmutear_microfono_si_es_necesario": False,
     "ganancia": 1.0,
     "bucle_referencia": False,
     "avance_automatico": True,
