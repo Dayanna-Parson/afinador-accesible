@@ -3,7 +3,7 @@
 import math
 import unittest
 
-from app.interfaz_gui import ESCALAS_POR_INSTRUMENTO, NOMBRE_LIRA, PRESETS_INSTRUMENTO
+from app.interfaz.ventana_principal import ESCALAS_POR_INSTRUMENTO, NOMBRE_LIRA, PRESETS_INSTRUMENTO
 from app.motor_audio import frecuencia_con_desplazamiento
 from app.afinaciones_maqam_lira import (
     AFINACIONES_LIRA_MAQAM_24EDO,

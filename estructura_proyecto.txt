@@ -9,7 +9,8 @@ DEVELOPMENT.md                    Arquitectura, reglas y pruebas.
 CLAUDE.md                         Reglas de colaboración y anclajes.
 
 app/
-  interfaz_gui.py                 Ventana principal wxPython; transición a pestañas.
+  interfaz/ventana_principal.py   Ventana principal wxPython; transición a pestañas.
+  interfaz_gui.py                 Compatibilidad temporal con la ruta anterior.
   motor_audio.py                  Captura de audio, YIN y tonos de referencia.
   afinaciones_maqam_lira.py       Presets estáticos de lira en 24-EDO.
   conector_nvda.py                Anuncios al lector de pantalla.

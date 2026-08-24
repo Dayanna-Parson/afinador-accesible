@@ -20,7 +20,8 @@ de forma autónoma, sin impedir una interfaz clara a quien ve.
 
 ## Capas del proyecto
 
-- `app/interfaz_gui.py`: ventana actual y coordinación de la interfaz wxPython.
+- `app/interfaz/ventana_principal.py`: ventana y coordinación wxPython.
+- `app/interfaz_gui.py`: compatibilidad temporal para importaciones antiguas.
 - `app/motor_audio.py`: captura, YIN y generación de tonos; no conoce widgets.
 - `app/afinaciones_maqam_lira.py`: afinaciones estáticas de la lira en 24-EDO.
 - `app/gestor_ajustes.py`: persistencia de preferencias del usuario.

@@ -8,7 +8,7 @@ from logging.handlers import RotatingFileHandler
 
 import wx
 
-from app.interfaz_gui import VentanaPrincipal
+from app.interfaz.ventana_principal import VentanaPrincipal
 
 RUTA_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "afinador.log")
 TAMANO_MAXIMO_LOG = 2 * 1024 * 1024
