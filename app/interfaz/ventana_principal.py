@@ -26,6 +26,7 @@ from app.afinaciones_maqam_lira import (
     AFINACIONES_LIRA_MAQAM_24EDO,
     NOMBRE_AFINACION_FABRICA_LIRA,
     NOMBRE_AFINACION_PERSONALIZADA_LIRA,
+    REFERENCIAS_GRADOS_MAQAM_24EDO,
 )
 from app.interfaz.ui_recursos import bitmap_icono
 
@@ -386,10 +387,12 @@ class VentanaPrincipal(wx.Frame):
             self.pagina_afinaciones,
             label="Para afinar normalmente, elige la primera opción de la lista."
         )
+        self.etiqueta_contexto_afinacion = wx.StaticText(self.pagina_afinaciones, label="")
+        self.etiqueta_contexto_afinacion.Wrap(560)
         self._organizar_pagina(
             self.pagina_afinaciones,
             ("Afinación seleccionada", (etiqueta_escala, self.selector_escala, self.boton_escucha_previa,
-                                          aviso_escala)),
+                                          aviso_escala, self.etiqueta_contexto_afinacion)),
         )
 
         # Audio y ajustes: opciones que rara vez hay que tocar durante una sesión.
@@ -674,19 +677,43 @@ class VentanaPrincipal(wx.Frame):
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
         self._avance_ya_realizado = False
+        self._actualizar_contexto_afinacion()
         if evento is not None:
             self._guardar_ajustes_actuales()
             evento.Skip()
 
     def _al_cambiar_escala(self, evento):
         self._aplicar_retoques_escala_activa()
+        self._actualizar_contexto_afinacion()
         self._guardar_ajustes_actuales()
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._historial_frecuencias.clear()
         self.anunciador.hablar("Escala aplicada: {}.".format(self.selector_escala.GetStringSelection()))
-        evento.Skip()
+        if evento is not None:
+            evento.Skip()
+
+    def _actualizar_contexto_afinacion(self):
+        """Explica la tónica real sin confundirla con la cuerda más grave de la lira."""
+        if self.selector_instrumento.GetStringSelection() != NOMBRE_LIRA:
+            self.etiqueta_contexto_afinacion.SetLabel("")
+            return
+        nombre = self.selector_escala.GetStringSelection()
+        if nombre == NOMBRE_AFINACION_FABRICA_LIRA:
+            texto = "Afinación de fábrica: notas de Do mayor. La cuerda más grave es Sol, pero no hay una tónica obligatoria hasta que toques una melodía o escala."
+        elif nombre == NOMBRE_AFINACION_PERSONALIZADA_LIRA:
+            texto = "Afinación personalizada: conserva tus retoques manuales. Comprueba cada nota objetivo antes de tocar."
+        elif nombre in REFERENCIAS_GRADOS_MAQAM_24EDO:
+            tonica = nombre.split("(sobre ", 1)[1].rstrip(")")
+            texto = (
+                "Tónica del maqam: {}. La escucha empieza por Sol grave porque es la primera cuerda física de la lira; "
+                "no significa que Sol sea la tónica. Esta adaptación conserva los siete grados en una afinación fija de lira."
+            ).format(tonica)
+        else:
+            texto = "Afinación seleccionada."
+        self.etiqueta_contexto_afinacion.SetLabel(texto)
+        self.etiqueta_contexto_afinacion.Wrap(560)
 
     def _aplicar_retoques_escala_activa(self):
         """Carga los retoques de la escala; la afinación de fábrica siempre es pura."""

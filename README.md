@@ -106,6 +106,17 @@ de golpe los retoques correspondientes sobre la afinación de fábrica.
 
 ### Lira: maqam árabe (cuartos de tono)
 
+La lira Aklot conserva una **afinación fija**: cada maqam ajusta sus 16 cuerdas
+para contener sus siete grados en varias octavas. La cuerda más grave es Sol,
+pero la tónica se indica en el nombre del maqam; por ejemplo, en Bayati sobre Re
+la tónica es Re, aunque la escucha previa comience por Sol grave. La app muestra
+esta aclaración al elegir el maqam.
+
+Esta adaptación es fiel a los grados de la escala dentro de una aproximación de
+24 divisiones por octava. No pretende sustituir la expresividad de un oud sin
+trastes, las palancas de un qanun ni las modulaciones que exigirían volver a
+afinar cuerdas durante una interpretación.
+
 - **Maqam Rast (sobre Sol)**: la cuerda de Si baja un cuarto de tono y la de Fa sube un
   cuarto de tono, en todas las octavas.
 - **Maqam Bayati (sobre Re)**: la cuerda de Si baja un semitono completo y la de Mi baja
