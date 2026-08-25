@@ -31,6 +31,7 @@ AJUSTES_POR_DEFECTO = {
     "escala": None,
     "familia_maqam": "Todas las familias",
     "ajustes_finos_cuerdas": {},
+    "afinaciones_guardadas_lira": {},
 }
 
 

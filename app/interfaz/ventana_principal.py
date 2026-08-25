@@ -101,6 +101,11 @@ OPCIONES_DURACION_VENTANA = [
     ("Alta precisión, notas graves (200 ms)", 0.2),
 ]
 OPCIONES_CANAL_ENTRADA = [("Automático (todos los canales)", None), ("Entrada 1", 0), ("Entrada 2", 1)]
+OPCIONES_PASO_RETOQUE = [
+    ("Cuarto de tono", 1),
+    ("Semitono", 2),
+    ("Tono", 4),
+]
 
 ID_ATAJO_REPRODUCIR_REFERENCIA = wx.NewIdRef()
 ID_ATAJO_ALTERNAR_ESCUCHA = wx.NewIdRef()
@@ -130,6 +135,7 @@ class VentanaPrincipal(wx.Frame):
         self.ajustes = cargar_ajustes()
         establecer_frecuencia_la4(float(self.ajustes.get("frecuencia_la4", 440.0)))
         self.ajustes_finos_cuerdas = dict(self.ajustes.get("ajustes_finos_cuerdas", {}))
+        self.afinaciones_guardadas_lira = dict(self.ajustes.get("afinaciones_guardadas_lira", {}))
         self.retoques_escala_activa = {}
         self._historial_retoques = []
         self.anunciador = AnunciadorNVDA()
@@ -388,10 +394,12 @@ class VentanaPrincipal(wx.Frame):
         self.selector_escala.SetHelpText("Las opciones dependen del instrumento elegido en la pestaña Afinar.")
         self.selector_escala.Bind(wx.EVT_CHOICE, self._al_cambiar_escala)
         self.boton_escucha_previa = wx.Button(
-            self.pagina_afinaciones, label="Escuchar la afinación seleccionada (Ctrl+Mayús+P)"
+            self.pagina_afinaciones, label="Escuchar la afinación completa actual (Ctrl+Mayús+P)"
         )
         self.boton_escucha_previa.SetBitmap(bitmap_icono("reproducir"))
-        self.boton_escucha_previa.SetHelpText("Reproduce solo las notas objetivo de la afinación actual.")
+        self.boton_escucha_previa.SetHelpText(
+            "Reproduce todas las notas objetivo, incluidos el maqam y los retoques manuales que hayas hecho."
+        )
         self.boton_escucha_previa.Bind(wx.EVT_BUTTON, self._al_escucha_previa_escala)
         aviso_escala = wx.StaticText(
             self.pagina_afinaciones,
@@ -399,12 +407,39 @@ class VentanaPrincipal(wx.Frame):
         )
         self.etiqueta_contexto_afinacion = wx.StaticText(self.pagina_afinaciones, label="")
         self.etiqueta_contexto_afinacion.Wrap(560)
+        etiqueta_paso_retoque = wx.StaticText(self.pagina_afinaciones, label="Tamaño del ajuste manual:")
+        self.selector_paso_retoque = wx.Choice(
+            self.pagina_afinaciones, choices=[nombre for nombre, _ in OPCIONES_PASO_RETOQUE]
+        )
+        self.selector_paso_retoque.SetSelection(0)
+        self.selector_paso_retoque.SetHelpText(
+            "Elige si las flechas y botones ajustan un cuarto de tono, un semitono o un tono."
+        )
+        self.boton_subir_retoque = wx.Button(self.pagina_afinaciones, label="Subir la cuerda seleccionada (Ctrl+Mayús+Flecha arriba)")
+        self.boton_subir_retoque.SetBitmap(bitmap_icono("afinar"))
+        self.boton_subir_retoque.Bind(wx.EVT_BUTTON, self._al_subir_cuarto_tono)
+        self.boton_bajar_retoque = wx.Button(self.pagina_afinaciones, label="Bajar la cuerda seleccionada (Ctrl+Mayús+Flecha abajo)")
+        self.boton_bajar_retoque.SetBitmap(bitmap_icono("afinar"))
+        self.boton_bajar_retoque.Bind(wx.EVT_BUTTON, self._al_bajar_cuarto_tono)
+        self.boton_restablecer_retoque = wx.Button(self.pagina_afinaciones, label="Restablecer ajuste manual de esta cuerda (Ctrl+Mayús+R)")
+        self.boton_restablecer_retoque.Bind(wx.EVT_BUTTON, self._al_restablecer_ajuste_fino)
+        etiqueta_guardadas = wx.StaticText(self.pagina_afinaciones, label="Afinaciones personales guardadas:")
+        self.selector_afinacion_guardada = wx.Choice(self.pagina_afinaciones)
+        self.boton_guardar_afinacion = wx.Button(self.pagina_afinaciones, label="Guardar afinación actual como...")
+        self.boton_guardar_afinacion.Bind(wx.EVT_BUTTON, self._al_guardar_afinacion_personal)
+        self.boton_cargar_afinacion = wx.Button(self.pagina_afinaciones, label="Cargar afinación guardada")
+        self.boton_cargar_afinacion.Bind(wx.EVT_BUTTON, self._al_cargar_afinacion_personal)
         self._organizar_pagina(
             self.pagina_afinaciones,
             ("Afinación seleccionada", (etiqueta_familia_maqam, self.selector_familia_maqam,
                                           etiqueta_escala, self.selector_escala,
                                           self.boton_escucha_previa, aviso_escala,
                                           self.etiqueta_contexto_afinacion)),
+            ("Ajuste manual de una cuerda", (etiqueta_paso_retoque, self.selector_paso_retoque,
+                                              self.boton_subir_retoque, self.boton_bajar_retoque,
+                                              self.boton_restablecer_retoque)),
+            ("Afinaciones personales", (etiqueta_guardadas, self.selector_afinacion_guardada,
+                                         self.boton_guardar_afinacion, self.boton_cargar_afinacion)),
         )
 
         # Audio y ajustes: opciones que rara vez hay que tocar durante una sesión.
@@ -475,7 +510,10 @@ class VentanaPrincipal(wx.Frame):
                 self.casilla_avance_automatico, self.casilla_pitido_confirmacion, self.casilla_modo_solo_escucha,
             ),
             self.pagina_afinaciones: (self.selector_familia_maqam, self.selector_escala,
-                                       self.boton_escucha_previa),
+                                       self.boton_escucha_previa, self.selector_paso_retoque,
+                                       self.boton_subir_retoque, self.boton_bajar_retoque,
+                                       self.boton_restablecer_retoque, self.selector_afinacion_guardada,
+                                       self.boton_guardar_afinacion, self.boton_cargar_afinacion),
             self.pagina_audio: (
                 self.selector_dispositivo, self.selector_canal, self.casilla_exclusivo_wasapi,
                 self.casilla_desmutear_microfono, self.selector_tasa, self.selector_buffer,
@@ -647,6 +685,7 @@ class VentanaPrincipal(wx.Frame):
             "escala": self.selector_escala.GetStringSelection() or None,
             "familia_maqam": self.selector_familia_maqam.GetStringSelection() or "Todas las familias",
             "ajustes_finos_cuerdas": self.ajustes_finos_cuerdas,
+            "afinaciones_guardadas_lira": self.afinaciones_guardadas_lira,
         })
         guardar_ajustes(self.ajustes)
 
@@ -683,6 +722,9 @@ class VentanaPrincipal(wx.Frame):
 
         instrumento = self.selector_instrumento.GetStringSelection()
         self.selector_familia_maqam.Enable(instrumento == NOMBRE_LIRA)
+        for control in (self.selector_afinacion_guardada, self.boton_guardar_afinacion, self.boton_cargar_afinacion):
+            control.Enable(instrumento == NOMBRE_LIRA)
+        self._actualizar_lista_afinaciones_guardadas()
         self._actualizar_opciones_escala()
 
         self.anunciador.reiniciar_estado()
@@ -730,6 +772,15 @@ class VentanaPrincipal(wx.Frame):
             self.selector_escala.Enable()
         else:
             self.selector_escala.Disable()
+
+    def _actualizar_lista_afinaciones_guardadas(self):
+        seleccion = self.selector_afinacion_guardada.GetStringSelection()
+        self.selector_afinacion_guardada.Clear()
+        self.selector_afinacion_guardada.Append("Selecciona una afinación guardada")
+        for nombre in sorted(self.afinaciones_guardadas_lira, key=str.casefold):
+            self.selector_afinacion_guardada.Append(nombre)
+        posicion = self.selector_afinacion_guardada.FindString(seleccion)
+        self.selector_afinacion_guardada.SetSelection(posicion if posicion != wx.NOT_FOUND else 0)
 
     def _al_cambiar_escala(self, evento):
         self._aplicar_retoques_escala_activa()
@@ -875,11 +926,17 @@ class VentanaPrincipal(wx.Frame):
             "Ajuste manual aplicado. {}".format(self._descripcion_objetivo_cuerda())
         )
 
+    def _paso_retoque_seleccionado(self):
+        posicion = self.selector_paso_retoque.GetSelection()
+        if posicion == wx.NOT_FOUND:
+            return 1
+        return OPCIONES_PASO_RETOQUE[posicion][1]
+
     def _al_subir_cuarto_tono(self, evento):
-        self._desplazar_cuarto_tono(1)
+        self._desplazar_cuarto_tono(self._paso_retoque_seleccionado())
 
     def _al_bajar_cuarto_tono(self, evento):
-        self._desplazar_cuarto_tono(-1)
+        self._desplazar_cuarto_tono(-self._paso_retoque_seleccionado())
 
     def _al_restablecer_ajuste_fino(self, evento):
         clave = self._clave_ajuste_fino()
@@ -892,7 +949,101 @@ class VentanaPrincipal(wx.Frame):
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._historial_frecuencias.clear()
-        self.anunciador.hablar("Ajuste manual restablecido. La escala seleccionada se mantiene.")
+        volvimos_a_fabrica = False
+        if (
+            self.selector_instrumento.GetStringSelection() == NOMBRE_LIRA
+            and self.selector_escala.GetStringSelection() == NOMBRE_AFINACION_PERSONALIZADA_LIRA
+            and not any(clave.startswith(NOMBRE_LIRA + "||") for clave in self.ajustes_finos_cuerdas)
+        ):
+            self.selector_escala.SetStringSelection(NOMBRE_AFINACION_FABRICA_LIRA)
+            self._aplicar_retoques_escala_activa()
+            self._actualizar_contexto_afinacion()
+            volvimos_a_fabrica = True
+        mensaje = (
+            "Ajuste manual restablecido. Vuelves a la afinación de fábrica."
+            if volvimos_a_fabrica
+            else "Ajuste manual restablecido. La escala seleccionada se mantiene."
+        )
+        self.anunciador.hablar(mensaje)
+
+    def _al_guardar_afinacion_personal(self, evento):
+        if self.selector_instrumento.GetStringSelection() != NOMBRE_LIRA:
+            self.anunciador.hablar("Las afinaciones personales están disponibles para la lira.")
+            return
+        dialogo = wx.TextEntryDialog(
+            self, "Escribe un nombre claro para esta afinación.", "Guardar afinación personal"
+        )
+        try:
+            if dialogo.ShowModal() != wx.ID_OK:
+                return
+            nombre = dialogo.GetValue().strip()
+        finally:
+            dialogo.Destroy()
+        if not nombre:
+            self.anunciador.hablar("No se guardó la afinación porque no tiene nombre.")
+            return
+        if nombre in self.afinaciones_guardadas_lira:
+            respuesta = wx.MessageBox(
+                "Ya existe una afinación con ese nombre. ¿Quieres reemplazarla?",
+                "Reemplazar afinación guardada",
+                wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION,
+                self,
+            )
+            if respuesta != wx.YES:
+                return
+        prefijo = NOMBRE_LIRA + "||"
+        manuales = {
+            clave[len(prefijo):]: valor for clave, valor in self.ajustes_finos_cuerdas.items()
+            if clave.startswith(prefijo) and valor
+        }
+        escala_base = self.selector_escala.GetStringSelection()
+        if escala_base == NOMBRE_AFINACION_PERSONALIZADA_LIRA:
+            escala_base = NOMBRE_AFINACION_FABRICA_LIRA
+        self.afinaciones_guardadas_lira[nombre] = {
+            "escala_base": escala_base,
+            "familia_maqam": self.selector_familia_maqam.GetStringSelection(),
+            "retoques_manuales": manuales,
+        }
+        self._actualizar_lista_afinaciones_guardadas()
+        self.selector_afinacion_guardada.SetStringSelection(nombre)
+        self._guardar_ajustes_actuales()
+        self.anunciador.hablar("Afinación guardada: {}.".format(nombre))
+
+    def _al_cargar_afinacion_personal(self, evento):
+        nombre = self.selector_afinacion_guardada.GetStringSelection()
+        datos = self.afinaciones_guardadas_lira.get(nombre)
+        if not datos:
+            self.anunciador.hablar("Selecciona primero una afinación guardada.")
+            return
+        escala_base = datos.get("escala_base", NOMBRE_AFINACION_FABRICA_LIRA)
+        familia = datos.get("familia_maqam", "Todas las familias")
+        if escala_base in REFERENCIAS_GRADOS_MAQAM_24EDO:
+            familia = next(
+                (nombre_familia for nombre_familia, maqamat in FAMILIAS_MAQAM_LIRA.items()
+                 if escala_base in maqamat),
+                "Todas las familias",
+            )
+        if self.selector_familia_maqam.FindString(familia) == wx.NOT_FOUND:
+            familia = "Todas las familias"
+        self.selector_instrumento.SetStringSelection(NOMBRE_LIRA)
+        self.selector_familia_maqam.SetStringSelection(familia)
+        self._actualizar_opciones_escala(preferida=escala_base)
+        if self.selector_escala.FindString(escala_base) == wx.NOT_FOUND:
+            escala_base = NOMBRE_AFINACION_FABRICA_LIRA
+            self._actualizar_opciones_escala(preferida=escala_base)
+        self.selector_escala.SetStringSelection(escala_base)
+        self._aplicar_retoques_escala_activa()
+        prefijo = NOMBRE_LIRA + "||"
+        self.ajustes_finos_cuerdas = {
+            clave: valor for clave, valor in self.ajustes_finos_cuerdas.items()
+            if not clave.startswith(prefijo)
+        }
+        for nombre_cuerda, valor in datos.get("retoques_manuales", {}).items():
+            self.ajustes_finos_cuerdas[prefijo + nombre_cuerda] = int(valor)
+        self._actualizar_contexto_afinacion()
+        self._guardar_ajustes_actuales()
+        self.anunciador.reiniciar_estado()
+        self.anunciador.hablar("Afinación cargada: {}.".format(nombre))
 
     def _al_deshacer_retoque(self, evento):
         if not self._historial_retoques:

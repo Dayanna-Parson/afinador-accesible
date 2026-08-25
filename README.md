@@ -71,8 +71,8 @@ sustituirán los anuncios de NVDA, JAWS o Narrador.
 
 - `Ctrl+P`: reproducir el tono de referencia de la cuerda/nota seleccionada.
 - `Ctrl+E`: iniciar o detener la escucha del micrófono.
-- `Ctrl+Mayús+Flecha arriba` / `Ctrl+Mayús+Flecha abajo`: retocar la cuerda seleccionada en
-  cuartos de tono (50 cents cada uno; dos cuartos de tono = un semitono).
+- `Ctrl+Mayús+Flecha arriba` / `Ctrl+Mayús+Flecha abajo`: subir o bajar la cuerda seleccionada
+  según el tamaño elegido en "Ajuste manual de una cuerda": cuarto de tono, semitono o tono.
 - `Ctrl+Mayús+R`: restablecer únicamente el ajuste manual de la cuerda seleccionada; la
   afinación o maqam elegido se conserva.
 - `Ctrl+Mayús+Z`: deshacer el último retoque en cuartos de tono (sobre cualquier cuerda, no
@@ -150,6 +150,14 @@ una de estas disposiciones y luego doblar la cuerda (bending) por oído.
 
 Cada retoque aplicado por una escala se puede seguir ajustando a mano con
 `Ctrl+Mayús+Flecha arriba/abajo` si el oído dice otra cosa.
+
+## Afinaciones personales guardadas
+
+En la pestaña **Afinaciones especiales**, el bloque "Afinaciones personales"
+permite guardar la afinación actual con un nombre y recuperarla más tarde. Se
+guarda tanto el maqam o afinación base como los retoques manuales de cada cuerda.
+Por tanto, puedes crear, por ejemplo, una versión propia de Bayati y volver a
+ella sin retocar de nuevo las 16 cuerdas.
 
 ## Escucha previa de la escala
 
