@@ -116,6 +116,31 @@ AFINACIONES_LIRA_MAQAM_24EDO = {
 # ANCLAJE_FIN: AFINACIONES_LIRA_MAQAM_24EDO
 
 
+# Orden pensado para elegir y aprender: primero una familia y luego un maqam.
+# Cada maqam aparece una sola vez; las variantes de Sikah se mantienen juntas.
+FAMILIAS_MAQAM_LIRA = {
+    "Rast": (
+        "Maqam Rast (sobre Do)", "Maqam Rast (sobre Sol)", "Maqam Suznak (sobre Do)",
+        "Maqam Mahur (sobre Do)", "Maqam Nayruz (sobre Do)",
+    ),
+    "Bayati": (
+        "Maqam Bayati (sobre Re)", "Maqam Bayati Shuri (sobre Re)",
+        "Maqam Bayati Husseini (sobre Re)",
+    ),
+    "Hijaz": ("Maqam Hijaz (sobre Re)", "Maqam Hijazkar (sobre Do)"),
+    "Sikah": (
+        "Maqam Sikah (sobre Mi medio bemol)", "Maqam Huzam (sobre Mi medio bemol)",
+        "Maqam Iraq (sobre Mi medio bemol)", "Maqam Bastanigar (sobre Mi medio bemol)",
+        "Maqam Awj Ara (sobre Si medio bemol)",
+    ),
+    "Saba": ("Maqam Saba (sobre Re)", "Maqam Saba Zamzam (sobre Re)"),
+    "Kurd": ("Maqam Kurd (sobre Re)", "Maqam Lami (sobre Re)"),
+    "Nahawand": ("Maqam Nahawand (sobre Do)", "Maqam Farahfaza (sobre Sol)"),
+    "Ajam": ("Maqam Ajam (sobre Si bemol)", "Maqam Shawq Afza (sobre Do)"),
+    "Nikriz": ("Maqam Nikriz (sobre Do)", "Maqam Athar Kurd (sobre Do)"),
+}
+
+
 # ANCLAJE_INICIO: REFERENCIAS_GRADOS_MAQAM_24EDO
 # Datos de control usados solo en las pruebas. Permiten comprobar que cada adaptación
 # estática conserva los siete grados de la fuente, sin que la aplicación los calcule

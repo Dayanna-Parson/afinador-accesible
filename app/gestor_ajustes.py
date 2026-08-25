@@ -29,6 +29,7 @@ AJUSTES_POR_DEFECTO = {
     "instrucciones_detalladas": False,
     "umbral_yin": 0.15,
     "escala": None,
+    "familia_maqam": "Todas las familias",
     "ajustes_finos_cuerdas": {},
 }
 

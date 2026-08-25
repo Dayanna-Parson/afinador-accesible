@@ -7,7 +7,9 @@ from app.interfaz.ventana_principal import ESCALAS_POR_INSTRUMENTO, NOMBRE_LIRA,
 from app.motor_audio import frecuencia_con_desplazamiento
 from app.afinaciones_maqam_lira import (
     AFINACIONES_LIRA_MAQAM_24EDO,
+    FAMILIAS_MAQAM_LIRA,
     NOMBRE_AFINACION_FABRICA_LIRA,
+    NOMBRE_AFINACION_PERSONALIZADA_LIRA,
     REFERENCIAS_GRADOS_MAQAM_24EDO,
     calcular_retoques_referencia_lira,
 )
@@ -35,6 +37,15 @@ class PruebasMaqamatLira(unittest.TestCase):
 
     def test_afinacion_de_fabrica_no_tiene_ningun_retoque(self):
         self.assertEqual(AFINACIONES_LIRA_MAQAM_24EDO[NOMBRE_AFINACION_FABRICA_LIRA], {})
+
+    def test_cada_maqam_pertenece_a_una_sola_familia(self):
+        maqamat_ordenados = [nombre for familia in FAMILIAS_MAQAM_LIRA.values() for nombre in familia]
+        maqamat_definidos = set(AFINACIONES_LIRA_MAQAM_24EDO) - {
+            NOMBRE_AFINACION_FABRICA_LIRA,
+            NOMBRE_AFINACION_PERSONALIZADA_LIRA,
+        }
+        self.assertEqual(set(maqamat_ordenados), maqamat_definidos)
+        self.assertEqual(len(maqamat_ordenados), len(set(maqamat_ordenados)))
 
     def test_cada_afinacion_coincide_con_sus_siete_grados_de_referencia(self):
         cuerdas = PRESETS_INSTRUMENTO[NOMBRE_LIRA]

@@ -24,6 +24,7 @@ from app.control_microfono import asegurar_microfono_activo
 from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
 from app.afinaciones_maqam_lira import (
     AFINACIONES_LIRA_MAQAM_24EDO,
+    FAMILIAS_MAQAM_LIRA,
     NOMBRE_AFINACION_FABRICA_LIRA,
     NOMBRE_AFINACION_PERSONALIZADA_LIRA,
     REFERENCIAS_GRADOS_MAQAM_24EDO,
@@ -373,6 +374,15 @@ class VentanaPrincipal(wx.Frame):
         )
 
         # Afinaciones especiales: no distrae de la afinación estándar.
+        etiqueta_familia_maqam = wx.StaticText(self.pagina_afinaciones, label="Familia de maqam:")
+        self.selector_familia_maqam = wx.Choice(
+            self.pagina_afinaciones, choices=["Todas las familias"] + list(FAMILIAS_MAQAM_LIRA)
+        )
+        self.selector_familia_maqam.SetSelection(0)
+        self.selector_familia_maqam.SetHelpText(
+            "Filtra los maqamat de la lira por familia. La afinación de fábrica siempre permanece disponible."
+        )
+        self.selector_familia_maqam.Bind(wx.EVT_CHOICE, self._al_cambiar_familia_maqam)
         etiqueta_escala = wx.StaticText(self.pagina_afinaciones, label="Escala o afinación:")
         self.selector_escala = wx.Choice(self.pagina_afinaciones)
         self.selector_escala.SetHelpText("Las opciones dependen del instrumento elegido en la pestaña Afinar.")
@@ -391,8 +401,10 @@ class VentanaPrincipal(wx.Frame):
         self.etiqueta_contexto_afinacion.Wrap(560)
         self._organizar_pagina(
             self.pagina_afinaciones,
-            ("Afinación seleccionada", (etiqueta_escala, self.selector_escala, self.boton_escucha_previa,
-                                          aviso_escala, self.etiqueta_contexto_afinacion)),
+            ("Afinación seleccionada", (etiqueta_familia_maqam, self.selector_familia_maqam,
+                                          etiqueta_escala, self.selector_escala,
+                                          self.boton_escucha_previa, aviso_escala,
+                                          self.etiqueta_contexto_afinacion)),
         )
 
         # Audio y ajustes: opciones que rara vez hay que tocar durante una sesión.
@@ -462,7 +474,8 @@ class VentanaPrincipal(wx.Frame):
                 self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia,
                 self.casilla_avance_automatico, self.casilla_pitido_confirmacion, self.casilla_modo_solo_escucha,
             ),
-            self.pagina_afinaciones: (self.selector_escala, self.boton_escucha_previa),
+            self.pagina_afinaciones: (self.selector_familia_maqam, self.selector_escala,
+                                       self.boton_escucha_previa),
             self.pagina_audio: (
                 self.selector_dispositivo, self.selector_canal, self.casilla_exclusivo_wasapi,
                 self.casilla_desmutear_microfono, self.selector_tasa, self.selector_buffer,
@@ -589,6 +602,10 @@ class VentanaPrincipal(wx.Frame):
         if nombre_instrumento and nombre_instrumento in PRESETS_INSTRUMENTO:
             self.selector_instrumento.SetStringSelection(nombre_instrumento)
 
+        familia_maqam = self.ajustes.get("familia_maqam")
+        if familia_maqam and self.selector_familia_maqam.FindString(familia_maqam) != wx.NOT_FOUND:
+            self.selector_familia_maqam.SetStringSelection(familia_maqam)
+
         self._al_cambiar_instrumento(None)
 
         nombre_cuerda = self.ajustes.get("cuerda")
@@ -628,6 +645,7 @@ class VentanaPrincipal(wx.Frame):
             "deteccion_automatica_cuerda": self.casilla_deteccion_automatica_cuerda.GetValue(),
             "instrucciones_detalladas": self.selector_verbosidad.GetSelection() == 1,
             "escala": self.selector_escala.GetStringSelection() or None,
+            "familia_maqam": self.selector_familia_maqam.GetStringSelection() or "Todas las familias",
             "ajustes_finos_cuerdas": self.ajustes_finos_cuerdas,
         })
         guardar_ajustes(self.ajustes)
@@ -664,15 +682,8 @@ class VentanaPrincipal(wx.Frame):
             self.selector_cuerda.Enable()
 
         instrumento = self.selector_instrumento.GetStringSelection()
-        escalas_disponibles = ESCALAS_POR_INSTRUMENTO.get(instrumento)
-        self.selector_escala.Clear()
-        if escalas_disponibles:
-            for nombre_escala in escalas_disponibles:
-                self.selector_escala.Append(nombre_escala)
-            self.selector_escala.SetSelection(0)
-            self.selector_escala.Enable()
-        else:
-            self.selector_escala.Disable()
+        self.selector_familia_maqam.Enable(instrumento == NOMBRE_LIRA)
+        self._actualizar_opciones_escala()
 
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
@@ -681,6 +692,44 @@ class VentanaPrincipal(wx.Frame):
         if evento is not None:
             self._guardar_ajustes_actuales()
             evento.Skip()
+
+    def _al_cambiar_familia_maqam(self, evento):
+        """Filtra los maqamat sin ocultar la afinación de fábrica de la lira."""
+        self._actualizar_opciones_escala()
+        self._aplicar_retoques_escala_activa()
+        self._actualizar_contexto_afinacion()
+        self._guardar_ajustes_actuales()
+        self.anunciador.reiniciar_estado()
+        self.anunciador.hablar(
+            "Familia seleccionada: {}.".format(self.selector_familia_maqam.GetStringSelection())
+        )
+        evento.Skip()
+
+    def _actualizar_opciones_escala(self, preferida=None):
+        """Rellena el selector según instrumento y familia, manteniendo un orden predecible."""
+        instrumento = self.selector_instrumento.GetStringSelection()
+        seleccion_anterior = preferida or self.selector_escala.GetStringSelection()
+        if instrumento == NOMBRE_LIRA:
+            familia = self.selector_familia_maqam.GetStringSelection()
+            maqamat = (
+                tuple(AFINACIONES_LIRA_MAQAM_24EDO)
+                if familia == "Todas las familias"
+                else FAMILIAS_MAQAM_LIRA.get(familia, ())
+            )
+            nombres = [NOMBRE_AFINACION_FABRICA_LIRA, NOMBRE_AFINACION_PERSONALIZADA_LIRA]
+            nombres.extend(nombre for nombre in maqamat if nombre not in nombres)
+        else:
+            nombres = list(ESCALAS_POR_INSTRUMENTO.get(instrumento, {}))
+
+        self.selector_escala.Clear()
+        for nombre in nombres:
+            self.selector_escala.Append(nombre)
+        if nombres:
+            posicion = self.selector_escala.FindString(seleccion_anterior)
+            self.selector_escala.SetSelection(posicion if posicion != wx.NOT_FOUND else 0)
+            self.selector_escala.Enable()
+        else:
+            self.selector_escala.Disable()
 
     def _al_cambiar_escala(self, evento):
         self._aplicar_retoques_escala_activa()

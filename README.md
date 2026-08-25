@@ -117,6 +117,11 @@ Esta adaptación es fiel a los grados de la escala dentro de una aproximación d
 trastes, las palancas de un qanun ni las modulaciones que exigirían volver a
 afinar cuerdas durante una interpretación.
 
+Para que la lista sea manejable, la pestaña **Afinaciones especiales** permite
+elegir primero una familia (Rast, Bayati, Hijaz, Sikah, Saba, Kurd, Nahawand,
+Ajam o Nikriz). Después muestra solo esa familia, junto a la afinación de fábrica
+y a la personalizada. Sikah incluye sus variantes Huzam, Iraq y Bastanigar.
+
 - **Maqam Rast (sobre Sol)**: la cuerda de Si baja un cuarto de tono y la de Fa sube un
   cuarto de tono, en todas las octavas.
 - **Maqam Bayati (sobre Re)**: la cuerda de Si baja un semitono completo y la de Mi baja
