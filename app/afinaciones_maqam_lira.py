@@ -14,8 +14,14 @@ la afinación fija que una lira puede mantener en un momento dado.
 import math
 
 # ANCLAJE_INICIO: AFINACIONES_LIRA_MAQAM_24EDO
+NOMBRE_AFINACION_FABRICA_LIRA = "Diatónica de fábrica (Do mayor, sin retoques)"
+NOMBRE_AFINACION_PERSONALIZADA_LIRA = "Afinación personalizada (mis retoques manuales)"
+
 AFINACIONES_LIRA_MAQAM_24EDO = {
-    "Diatónica de fábrica (notas de Do mayor; comienza en Sol grave)": {},
+    # Esta opción es siempre 0: ninguna nota alterada ni cuarto de tono.
+    NOMBRE_AFINACION_FABRICA_LIRA: {},
+    # Los retoques manuales se aplican fuera de esta tabla; esta entrada solo los identifica.
+    NOMBRE_AFINACION_PERSONALIZADA_LIRA: {},
     "Maqam Rast (sobre Sol)": {
         "Cuerda 3 (Si)": -1, "Cuerda 7 (Fa)": 1, "Cuerda 10 (Si)": -1, "Cuerda 14 (Fa)": 1,
     },

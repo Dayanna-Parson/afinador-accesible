@@ -22,7 +22,11 @@ from app.motor_audio import (
 from app.conector_nvda import AnunciadorNVDA
 from app.control_microfono import asegurar_microfono_activo
 from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
-from app.afinaciones_maqam_lira import AFINACIONES_LIRA_MAQAM_24EDO
+from app.afinaciones_maqam_lira import (
+    AFINACIONES_LIRA_MAQAM_24EDO,
+    NOMBRE_AFINACION_FABRICA_LIRA,
+    NOMBRE_AFINACION_PERSONALIZADA_LIRA,
+)
 from app.interfaz.ui_recursos import bitmap_icono
 
 logger = logging.getLogger(__name__)
@@ -309,7 +313,6 @@ class VentanaPrincipal(wx.Frame):
         self.cuaderno.AddPage(self.pagina_afinar, "Afinar", select=True)
         self.cuaderno.AddPage(self.pagina_afinaciones, "Afinaciones especiales")
         self.cuaderno.AddPage(self.pagina_audio, "Audio y ajustes")
-        self.cuaderno.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self._al_cambiar_pestana)
 
         # Afinar: lo necesario para una sesión corriente.
         etiqueta_instrumento = wx.StaticText(self.pagina_afinar, label="Instrumento:")
@@ -450,6 +453,20 @@ class VentanaPrincipal(wx.Frame):
         )
         principal.Add(self.cuaderno, 1, wx.EXPAND | wx.ALL, 8)
         self.SetSizer(principal)
+        self._controles_pestana = {
+            self.pagina_afinar: (
+                self.selector_instrumento, self.selector_cuerda, self.casilla_deteccion_automatica_cuerda,
+                self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia,
+                self.casilla_avance_automatico, self.casilla_pitido_confirmacion, self.casilla_modo_solo_escucha,
+            ),
+            self.pagina_afinaciones: (self.selector_escala, self.boton_escucha_previa),
+            self.pagina_audio: (
+                self.selector_dispositivo, self.selector_canal, self.casilla_exclusivo_wasapi,
+                self.casilla_desmutear_microfono, self.selector_tasa, self.selector_buffer,
+                self.control_ganancia, self.control_sensibilidad, self.control_la4, self.selector_verbosidad,
+            ),
+        }
+        self.Bind(wx.EVT_CHAR_HOOK, self._al_navegacion_con_tab)
 
     def _crear_pagina_desplazable(self):
         pagina = wx.ScrolledWindow(self.cuaderno, style=wx.VSCROLL)
@@ -473,12 +490,23 @@ class VentanaPrincipal(wx.Frame):
         pagina.SetSizer(distribucion)
         distribucion.Fit(pagina)
 
-    def _al_cambiar_pestana(self, evento):
-        focos = (self.selector_instrumento, self.selector_escala, self.selector_dispositivo)
-        indice = evento.GetSelection()
-        if 0 <= indice < len(focos):
-            wx.CallAfter(focos[indice].SetFocus)
-        evento.Skip()
+    def _al_navegacion_con_tab(self, evento):
+        """Cierra el recorrido con Tab sin cambiar nunca el foco al usar flechas."""
+        if evento.GetKeyCode() != wx.WXK_TAB or evento.ControlDown() or evento.AltDown():
+            evento.Skip()
+            return
+        controles = self._controles_pestana.get(self.cuaderno.GetCurrentPage(), ())
+        foco = wx.Window.FindFocus()
+        indice = next(
+            (posicion for posicion, control in enumerate(controles)
+             if foco == control or control.IsDescendant(foco)),
+            None,
+        )
+        if indice is None:
+            evento.Skip()
+            return
+        paso = -1 if evento.ShiftDown() else 1
+        controles[(indice + paso) % len(controles)].SetFocus()
 
     def _construir_atajos(self):
         """Ctrl+P reproduce el tono de referencia, Ctrl+E alterna la escucha, Ctrl+Mayús+Flecha
@@ -661,9 +689,15 @@ class VentanaPrincipal(wx.Frame):
         evento.Skip()
 
     def _aplicar_retoques_escala_activa(self):
-        """Carga los retoques propios de la escala sin alterar los retoques manuales."""
+        """Carga los retoques de la escala; la afinación de fábrica siempre es pura."""
         instrumento = self.selector_instrumento.GetStringSelection()
         nombre_escala = self.selector_escala.GetStringSelection()
+        if instrumento == NOMBRE_LIRA and nombre_escala == NOMBRE_AFINACION_FABRICA_LIRA:
+            prefijo = NOMBRE_LIRA + "||"
+            self.ajustes_finos_cuerdas = {
+                clave: valor for clave, valor in self.ajustes_finos_cuerdas.items()
+                if not clave.startswith(prefijo)
+            }
         desplazamientos = ESCALAS_POR_INSTRUMENTO.get(instrumento, {}).get(nombre_escala, {})
         self.retoques_escala_activa = {
             "{}||{}".format(instrumento, nombre_cuerda): cuartos_tono
@@ -745,6 +779,12 @@ class VentanaPrincipal(wx.Frame):
         if clave is None:
             self.anunciador.hablar("No hay ninguna cuerda seleccionada para retocar.")
             return
+        if (
+            self.selector_instrumento.GetStringSelection() == NOMBRE_LIRA
+            and self.selector_escala.GetStringSelection() == NOMBRE_AFINACION_FABRICA_LIRA
+        ):
+            self.selector_escala.SetStringSelection(NOMBRE_AFINACION_PERSONALIZADA_LIRA)
+            self._aplicar_retoques_escala_activa()
         retoque_manual_previo = self.ajustes_finos_cuerdas.get(clave, 0)
         self._historial_retoques.append((clave, retoque_manual_previo))
         retoque_manual = retoque_manual_previo + delta
