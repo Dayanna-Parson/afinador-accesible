@@ -52,6 +52,20 @@ AFINACIONES_LIRA_MAQAM_24EDO = {
     "Maqam Sikah (sobre Mi medio bemol)": {
         "Cuerda 3 (Si)": -1, "Cuerda 6 (Mi)": -1, "Cuerda 10 (Si)": -1, "Cuerda 13 (Mi)": -1,
     },
+    "Maqam Huzam (sobre Mi medio bemol)": {
+        "Cuerda 2 (La)": -2, "Cuerda 6 (Mi)": -1, "Cuerda 9 (La)": -2,
+        "Cuerda 13 (Mi)": -1, "Cuerda 16 (La)": -2,
+    },
+    "Maqam Iraq (sobre Mi medio bemol)": {
+        "Cuerda 2 (La)": -1, "Cuerda 3 (Si)": -2, "Cuerda 6 (Mi)": -1,
+        "Cuerda 9 (La)": -1, "Cuerda 10 (Si)": -2, "Cuerda 13 (Mi)": -1,
+        "Cuerda 16 (La)": -1,
+    },
+    "Maqam Bastanigar (sobre Mi medio bemol)": {
+        "Cuerda 2 (La)": -1, "Cuerda 3 (Si)": -2, "Cuerda 4 (Do)": -2,
+        "Cuerda 6 (Mi)": -1, "Cuerda 9 (La)": -1, "Cuerda 10 (Si)": -2,
+        "Cuerda 11 (Do)": -2, "Cuerda 13 (Mi)": -1, "Cuerda 16 (La)": -1,
+    },
     "Maqam Suznak (sobre Do)": {
         "Cuerda 2 (La)": -2, "Cuerda 6 (Mi)": -1, "Cuerda 9 (La)": -2,
         "Cuerda 13 (Mi)": -1, "Cuerda 16 (La)": -2,
@@ -116,6 +130,9 @@ REFERENCIAS_GRADOS_MAQAM_24EDO = {
     "Maqam Nahawand (sobre Do)": (0, 0, (0, 200, 300, 500, 700, 800, 1100)),
     "Maqam Ajam (sobre Si bemol)": (10, 0, (0, 200, 400, 500, 700, 900, 1100)),
     "Maqam Sikah (sobre Mi medio bemol)": (4, -50, (0, 150, 350, 550, 700, 850, 1050)),
+    "Maqam Huzam (sobre Mi medio bemol)": (4, -50, (0, 150, 350, 450, 750, 850, 1050)),
+    "Maqam Iraq (sobre Mi medio bemol)": (4, -50, (0, 150, 350, 500, 650, 850, 1050)),
+    "Maqam Bastanigar (sobre Mi medio bemol)": (4, -50, (0, 150, 350, 500, 650, 750, 1050)),
     "Maqam Suznak (sobre Do)": (0, 0, (0, 200, 350, 500, 700, 800, 1100)),
     "Maqam Nikriz (sobre Do)": (0, 0, (0, 200, 300, 600, 700, 900, 1000)),
     "Maqam Athar Kurd (sobre Do)": (0, 0, (0, 100, 300, 600, 700, 800, 1100)),
