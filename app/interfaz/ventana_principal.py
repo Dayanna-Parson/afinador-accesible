@@ -3,7 +3,9 @@
 import logging
 import statistics
 import time
+import webbrowser
 from collections import deque
+from pathlib import Path
 
 import numpy as np
 import wx
@@ -22,6 +24,7 @@ from app.motor_audio import (
 from app.conector_nvda import AnunciadorNVDA
 from app.control_microfono import asegurar_microfono_activo
 from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
+from app.config_rutas import RUTA_AYUDA
 from app.afinaciones_maqam_lira import (
     AFINACIONES_LIRA_MAQAM_24EDO,
     FAMILIAS_MAQAM_LIRA,
@@ -29,7 +32,7 @@ from app.afinaciones_maqam_lira import (
     NOMBRE_AFINACION_PERSONALIZADA_LIRA,
     REFERENCIAS_GRADOS_MAQAM_24EDO,
 )
-from app.interfaz.ui_recursos import bitmap_icono
+from app.interfaz.ui_recursos import aplicar_icono_boton
 
 logger = logging.getLogger(__name__)
 
@@ -163,153 +166,7 @@ class VentanaPrincipal(wx.Frame):
         self.Show()
 
     def _construir_controles(self):
-        return self._construir_controles_con_pestanas()
-
-        # Implementación conservada temporalmente como referencia durante la migración.
-        panel = wx.ScrolledWindow(self, style=wx.VSCROLL)
-        panel.SetScrollRate(0, 20)
-        distribucion = wx.BoxSizer(wx.VERTICAL)
-
-        etiqueta_dispositivo = wx.StaticText(panel, label="Dispositivo de entrada de audio:")
-        self.selector_dispositivo = wx.Choice(panel)
-        self.selector_dispositivo.Bind(wx.EVT_CHOICE, self._al_cambiar_dispositivo)
-
-        etiqueta_tasa = wx.StaticText(panel, label="Tasa de muestreo:")
-        self.selector_tasa = wx.Choice(panel, choices=[etiqueta for etiqueta, _ in OPCIONES_TASA_MUESTREO])
-        self.selector_tasa.SetSelection(0)
-        self.selector_tasa.Bind(wx.EVT_CHOICE, self._al_cambiar_calidad_captura)
-
-        etiqueta_buffer = wx.StaticText(panel, label="Tamaño de búfer:")
-        self.selector_buffer = wx.Choice(panel, choices=[etiqueta for etiqueta, _ in OPCIONES_DURACION_VENTANA])
-        self.selector_buffer.SetSelection(1)
-        self.selector_buffer.Bind(wx.EVT_CHOICE, self._al_cambiar_calidad_captura)
-
-        etiqueta_canal = wx.StaticText(panel, label="Canal de entrada:")
-        self.selector_canal = wx.Choice(panel, choices=[etiqueta for etiqueta, _ in OPCIONES_CANAL_ENTRADA])
-        self.selector_canal.SetSelection(0)
-        self.selector_canal.Bind(wx.EVT_CHOICE, self._al_cambiar_calidad_captura)
-
-        etiqueta_la4 = wx.StaticText(panel, label="Referencia La4 (Hz):")
-        self.control_la4 = wx.SpinCtrlDouble(panel, min=400.0, max=480.0, initial=440.0, inc=1.0)
-        self.control_la4.SetDigits(1)
-        self.control_la4.SetLabel("Referencia La4 en hercios")
-        self.control_la4.Bind(wx.EVT_SPINCTRLDOUBLE, self._al_cambiar_la4)
-
-        etiqueta_instrumento = wx.StaticText(panel, label="Instrumento:")
-        self.selector_instrumento = wx.Choice(panel, choices=list(PRESETS_INSTRUMENTO.keys()))
-        self.selector_instrumento.SetSelection(0)
-        self.selector_instrumento.Bind(wx.EVT_CHOICE, self._al_cambiar_instrumento)
-
-        etiqueta_cuerda = wx.StaticText(panel, label="Cuerda objetivo:")
-        self.selector_cuerda = wx.Choice(panel)
-        self.selector_cuerda.Bind(wx.EVT_CHOICE, self._al_cambiar_cuerda)
-
-        etiqueta_escala = wx.StaticText(panel, label="Escala / afinación:")
-        self.selector_escala = wx.Choice(panel)
-        self.selector_escala.Bind(wx.EVT_CHOICE, self._al_cambiar_escala)
-
-        self.casilla_avance_automatico = wx.CheckBox(panel, label="Avanzar automáticamente a la siguiente cuerda al afinar")
-        self.casilla_avance_automatico.SetValue(True)
-        self.casilla_avance_automatico.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
-        self.casilla_pitido_confirmacion = wx.CheckBox(panel, label="Reproducir pitido al afinar correctamente")
-        self.casilla_pitido_confirmacion.SetValue(True)
-        self.casilla_pitido_confirmacion.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
-
-        self.casilla_modo_solo_escucha = wx.CheckBox(
-            panel, label="Modo solo escucha (dice la nota detectada, sin instrucciones de sube/baja)"
-        )
-        self.casilla_modo_solo_escucha.SetValue(False)
-        self.casilla_modo_solo_escucha.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
-
-        self.casilla_deteccion_automatica_cuerda = wx.CheckBox(
-            panel, label="Detectar automáticamente qué cuerda suena (sin tener que seleccionarla antes)"
-        )
-        self.casilla_deteccion_automatica_cuerda.SetValue(False)
-        self.casilla_deteccion_automatica_cuerda.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
-
-        etiqueta_verbosidad = wx.StaticText(panel, label="Nivel de detalle de las instrucciones:")
-        self.selector_verbosidad = wx.Choice(panel, choices=["Conciso", "Detallado (con cents exactos)"])
-        self.selector_verbosidad.SetSelection(0)
-        self.selector_verbosidad.Bind(wx.EVT_CHOICE, self._al_cambiar_ajuste_simple)
-
-        self.casilla_exclusivo_wasapi = wx.CheckBox(
-            panel, label="Modo exclusivo WASAPI (solo micrófonos dedicados; puede fallar con "
-                         "dispositivos compuestos como \"Varios micrófonos\")"
-        )
-        self.casilla_exclusivo_wasapi.SetValue(False)
-        self.casilla_exclusivo_wasapi.Bind(wx.EVT_CHECKBOX, self._al_cambiar_calidad_captura)
-
-        self.casilla_desmutear_microfono = wx.CheckBox(
-            panel, label="Desmutear el micrófono si Windows lo tiene silenciado"
-        )
-        self.casilla_desmutear_microfono.SetValue(False)
-        self.casilla_desmutear_microfono.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
-
-        etiqueta_ganancia = wx.StaticText(panel, label="Ganancia de entrada:")
-        self.control_ganancia = wx.SpinCtrlDouble(
-            panel, min=1.0, max=5.0, initial=1.0, inc=0.5
-        )
-        self.control_ganancia.SetDigits(1)
-        self.control_ganancia.SetLabel("Ganancia de entrada")
-        self.control_ganancia.Bind(wx.EVT_SPINCTRLDOUBLE, self._al_cambiar_calidad_captura)
-        # SpinCtrlDouble no toma el nombre accesible del StaticText contiguo ni respeta
-        # siempre SetLabel() en NVDA: se anuncia el valor con voz propia al recibir el foco,
-        # el mismo patrón que ya se usa en el resto de la app para lo que SetLabel() no cubre.
-        self.control_ganancia.Bind(wx.EVT_SET_FOCUS, self._al_enfocar_control_ganancia)
-
-        etiqueta_sensibilidad = wx.StaticText(panel, label="Sensibilidad de detección (más alto = más permisivo):")
-        self.control_sensibilidad = wx.SpinCtrlDouble(
-            panel, min=0.05, max=0.40, initial=0.15, inc=0.05
-        )
-        self.control_sensibilidad.SetDigits(2)
-        self.control_sensibilidad.SetLabel("Sensibilidad de detección")
-        self.control_sensibilidad.Bind(wx.EVT_SPINCTRLDOUBLE, self._al_cambiar_calidad_captura)
-        self.control_sensibilidad.Bind(wx.EVT_SET_FOCUS, self._al_enfocar_control_sensibilidad)
-
-        self.etiqueta_nota = wx.StaticText(panel, label="Nota detectada: —")
-        self.etiqueta_instruccion = wx.StaticText(panel, label="Instrucción: —")
-        self.etiqueta_nivel = wx.StaticText(panel, label="Nivel de entrada: —")
-
-        self.boton_escucha = wx.Button(panel, label="Iniciar escucha (Ctrl+E)")
-        self.boton_escucha.Bind(wx.EVT_BUTTON, self._al_alternar_escucha)
-
-        self.boton_referencia = wx.Button(panel, label="Reproducir tono de referencia (Ctrl+P)")
-        self.boton_referencia.Bind(wx.EVT_BUTTON, self._al_reproducir_referencia)
-
-        self.boton_escucha_previa = wx.Button(
-            panel, label="Escuchar la escala o afinación seleccionada (Ctrl+Mayús+P)"
-        )
-        self.boton_escucha_previa.Bind(wx.EVT_BUTTON, self._al_escucha_previa_escala)
-
-        self.casilla_bucle_referencia = wx.CheckBox(panel, label="Repetir el tono de referencia en bucle")
-        self.casilla_bucle_referencia.SetValue(False)
-        self.casilla_bucle_referencia.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_bucle)
-
-        for widget in (
-            etiqueta_dispositivo, self.selector_dispositivo,
-            etiqueta_tasa, self.selector_tasa,
-            etiqueta_buffer, self.selector_buffer,
-            etiqueta_canal, self.selector_canal,
-            etiqueta_la4, self.control_la4,
-            etiqueta_instrumento, self.selector_instrumento,
-            etiqueta_cuerda, self.selector_cuerda,
-            etiqueta_escala, self.selector_escala,
-            self.casilla_avance_automatico,
-            self.casilla_pitido_confirmacion,
-            self.casilla_modo_solo_escucha,
-            self.casilla_deteccion_automatica_cuerda,
-            etiqueta_verbosidad, self.selector_verbosidad,
-            self.casilla_exclusivo_wasapi,
-            self.casilla_desmutear_microfono,
-            etiqueta_ganancia, self.control_ganancia,
-            etiqueta_sensibilidad, self.control_sensibilidad,
-            self.etiqueta_nota, self.etiqueta_instruccion, self.etiqueta_nivel,
-            self.boton_escucha, self.boton_referencia, self.boton_escucha_previa, self.casilla_bucle_referencia,
-        ):
-            distribucion.Add(widget, 0, wx.ALL | wx.EXPAND, 8)
-
-        panel.SetSizer(distribucion)
-        distribucion.Fit(panel)
+        self._construir_controles_con_pestanas()
 
     def _construir_controles_con_pestanas(self):
         """Crea cada control dentro de su página; wx no permite reparentar con fiabilidad."""
@@ -344,11 +201,11 @@ class VentanaPrincipal(wx.Frame):
         self.etiqueta_instruccion = wx.StaticText(self.pagina_afinar, label="Instrucción: —")
         self.etiqueta_nivel = wx.StaticText(self.pagina_afinar, label="Nivel de entrada: —")
         self.boton_escucha = wx.Button(self.pagina_afinar, label="Iniciar escucha (Ctrl+E)")
-        self.boton_escucha.SetBitmap(bitmap_icono("afinar"))
+        aplicar_icono_boton(self.boton_escucha, "afinar", fijar_nombre=False)
         self.boton_escucha.SetHelpText("Inicia o detiene la escucha del micrófono.")
         self.boton_escucha.Bind(wx.EVT_BUTTON, self._al_alternar_escucha)
         self.boton_referencia = wx.Button(self.pagina_afinar, label="Reproducir tono de referencia (Ctrl+P)")
-        self.boton_referencia.SetBitmap(bitmap_icono("reproducir"))
+        aplicar_icono_boton(self.boton_referencia, "reproducir")
         self.boton_referencia.SetHelpText("Reproduce el tono de la cuerda objetivo.")
         self.boton_referencia.Bind(wx.EVT_BUTTON, self._al_reproducir_referencia)
         self.casilla_bucle_referencia = wx.CheckBox(self.pagina_afinar, label="Repetir el tono de referencia en bucle")
@@ -396,7 +253,7 @@ class VentanaPrincipal(wx.Frame):
         self.boton_escucha_previa = wx.Button(
             self.pagina_afinaciones, label="Escuchar la afinación completa actual (Ctrl+Mayús+P)"
         )
-        self.boton_escucha_previa.SetBitmap(bitmap_icono("reproducir"))
+        aplicar_icono_boton(self.boton_escucha_previa, "reproducir")
         self.boton_escucha_previa.SetHelpText(
             "Reproduce todas las notas objetivo, incluidos el maqam y los retoques manuales que hayas hecho."
         )
@@ -416,18 +273,21 @@ class VentanaPrincipal(wx.Frame):
             "Elige si las flechas y botones ajustan un cuarto de tono, un semitono o un tono."
         )
         self.boton_subir_retoque = wx.Button(self.pagina_afinaciones, label="Subir la cuerda seleccionada (Ctrl+Mayús+Flecha arriba)")
-        self.boton_subir_retoque.SetBitmap(bitmap_icono("afinar"))
+        aplicar_icono_boton(self.boton_subir_retoque, "subir")
         self.boton_subir_retoque.Bind(wx.EVT_BUTTON, self._al_subir_cuarto_tono)
         self.boton_bajar_retoque = wx.Button(self.pagina_afinaciones, label="Bajar la cuerda seleccionada (Ctrl+Mayús+Flecha abajo)")
-        self.boton_bajar_retoque.SetBitmap(bitmap_icono("afinar"))
+        aplicar_icono_boton(self.boton_bajar_retoque, "bajar")
         self.boton_bajar_retoque.Bind(wx.EVT_BUTTON, self._al_bajar_cuarto_tono)
         self.boton_restablecer_retoque = wx.Button(self.pagina_afinaciones, label="Restablecer ajuste manual de esta cuerda (Ctrl+Mayús+R)")
+        aplicar_icono_boton(self.boton_restablecer_retoque, "restablecer")
         self.boton_restablecer_retoque.Bind(wx.EVT_BUTTON, self._al_restablecer_ajuste_fino)
         etiqueta_guardadas = wx.StaticText(self.pagina_afinaciones, label="Afinaciones personales guardadas:")
         self.selector_afinacion_guardada = wx.Choice(self.pagina_afinaciones)
         self.boton_guardar_afinacion = wx.Button(self.pagina_afinaciones, label="Guardar afinación actual como...")
+        aplicar_icono_boton(self.boton_guardar_afinacion, "guardar")
         self.boton_guardar_afinacion.Bind(wx.EVT_BUTTON, self._al_guardar_afinacion_personal)
         self.boton_cargar_afinacion = wx.Button(self.pagina_afinaciones, label="Cargar afinación guardada")
+        aplicar_icono_boton(self.boton_cargar_afinacion, "cargar")
         self.boton_cargar_afinacion.Bind(wx.EVT_BUTTON, self._al_cargar_afinacion_personal)
         self._organizar_pagina(
             self.pagina_afinaciones,
@@ -545,8 +405,19 @@ class VentanaPrincipal(wx.Frame):
         distribucion.Fit(pagina)
 
     def _al_navegacion_con_tab(self, evento):
-        """Cierra el recorrido con Tab sin cambiar nunca el foco al usar flechas."""
-        if evento.GetKeyCode() != wx.WXK_TAB or evento.ControlDown() or evento.AltDown():
+        """Atajos globales seguros; las flechas nunca cambian el foco de pestaña."""
+        tecla = evento.GetKeyCode()
+        if tecla == wx.WXK_F1:
+            self._abrir_ayuda()
+            return
+        if (
+            evento.ControlDown() and not evento.ShiftDown() and not evento.AltDown()
+            and tecla in (ord("1"), ord("2"), ord("3"))
+        ):
+            self.cuaderno.SetSelection(tecla - ord("1"))
+            wx.CallAfter(self.cuaderno.SetFocus)
+            return
+        if tecla != wx.WXK_TAB or evento.ControlDown() or evento.AltDown():
             evento.Skip()
             return
         controles = self._controles_pestana.get(self.cuaderno.GetCurrentPage(), ())
@@ -561,6 +432,15 @@ class VentanaPrincipal(wx.Frame):
             return
         paso = -1 if evento.ShiftDown() else 1
         controles[(indice + paso) % len(controles)].SetFocus()
+
+    def _abrir_ayuda(self):
+        """Abre la ayuda local con el navegador predeterminado, sin bloquear el afinador."""
+        try:
+            webbrowser.open(Path(RUTA_AYUDA).resolve().as_uri())
+            self.anunciador.hablar("Ayuda abierta en el navegador.")
+        except Exception:
+            logger.exception("no se pudo abrir la ayuda local")
+            self.anunciador.hablar("No se pudo abrir la ayuda local.")
 
     def _construir_atajos(self):
         """Ctrl+P reproduce el tono de referencia, Ctrl+E alterna la escucha, Ctrl+Mayús+Flecha

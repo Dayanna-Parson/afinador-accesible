@@ -5,3 +5,4 @@ import os
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUTA_CONFIGURACIONES = os.path.join(RAIZ, "configuraciones")
 RUTA_AJUSTES = os.path.join(RUTA_CONFIGURACIONES, "ajustes.json")
+RUTA_AYUDA = os.path.join(RAIZ, "ayuda.html")

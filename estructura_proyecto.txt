@@ -6,10 +6,14 @@ INICIAR_AFINADOR.bat              Inicia la aplicación.
 INSTALAR_AFINADOR.bat             Crea el entorno e instala dependencias.
 README.md                         Guía breve de instalación y uso.
 DEVELOPMENT.md                    Arquitectura, reglas y pruebas.
+ayuda.html                        Ayuda local, abierta con F1.
+novedades.txt                     Cambios relevantes para quien utiliza la app.
+AUDITORIA_EPUB_TTS.md             Decisiones de adaptación tomadas tras revisar EPUB TTS.
 CLAUDE.md                         Reglas de colaboración y anclajes.
 
 app/
-  interfaz/ventana_principal.py   Ventana principal wxPython; transición a pestañas.
+  interfaz/ventana_principal.py   Ventana wxPython, pestañas y navegación accesible.
+  interfaz/ui_recursos.py         Iconos opcionales con respaldo nativo de wxPython.
   interfaz_gui.py                 Compatibilidad temporal con la ruta anterior.
   motor_audio.py                  Captura de audio, YIN y tonos de referencia.
   afinaciones_maqam_lira.py       Presets estáticos de lira en 24-EDO.
@@ -23,4 +27,7 @@ tests/
   test_maqamat.py                 Coherencia musical de las afinaciones de lira.
 
 motor_rust/                       Aceleración opcional de captura; Python sigue siendo respaldo.
+recursos/
+  iconos/                         Iconos PNG opcionales; los botones conservan texto accesible.
+  sonidos/                        Lugar preparado para sonidos elegidos y documentados.
 configuraciones/                  Datos locales de la persona usuaria; no versionar.

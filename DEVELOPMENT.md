@@ -15,12 +15,16 @@ de forma autónoma, sin impedir una interfaz clara a quien ve.
   lentos se comunican con `wx.CallAfter`.
 - Un control sin nombre, estado o ayuda comprensible en NVDA es un error crítico.
 - No se usa Espacio como atajo global.
+- Las flechas conservan su comportamiento nativo: no se usan para cambiar de
+  pestaña ni para desplazar el foco de forma inesperada.
+- Los iconos acompañan al texto; nunca son la única forma de identificar una acción.
 - La captura se pausa antes de reproducir una referencia y se reanuda con cuidado.
 - Los cambios deben ser quirúrgicos y respetar los bloques `ANCLAJE`.
 
 ## Capas del proyecto
 
 - `app/interfaz/ventana_principal.py`: ventana y coordinación wxPython.
+- `app/interfaz/ui_recursos.py`: iconos opcionales y respaldo visual nativo.
 - `app/interfaz_gui.py`: compatibilidad temporal para importaciones antiguas.
 - `app/motor_audio.py`: captura, YIN y generación de tonos; no conoce widgets.
 - `app/afinaciones_maqam_lira.py`: afinaciones estáticas de la lira en 24-EDO.
@@ -45,4 +49,6 @@ python -m compileall -q app tests iniciar_afinador.py
 
 Además, se debe probar en Windows con NVDA: recorrido con Tab y Mayús+Tab,
 anuncios de cambio de cuerda, inicio/parada de escucha, WASAPI y reproducción
-de referencias.
+de referencias. También hay que comprobar que, al cambiar de pestaña con las
+flechas desde el cuaderno, el foco no salta al primer control, y que F1 abre
+`ayuda.html`.

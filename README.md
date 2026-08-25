@@ -69,6 +69,8 @@ sustituirán los anuncios de NVDA, JAWS o Narrador.
 
 ## Atajos de teclado
 
+- `F1`: abrir la ayuda local.
+- `Ctrl+1`, `Ctrl+2`, `Ctrl+3`: abrir Afinar, Afinaciones especiales o Audio y ajustes.
 - `Ctrl+P`: reproducir el tono de referencia de la cuerda/nota seleccionada.
 - `Ctrl+E`: iniciar o detener la escucha del micrófono.
 - `Ctrl+Mayús+Flecha arriba` / `Ctrl+Mayús+Flecha abajo`: subir o bajar la cuerda seleccionada
@@ -84,7 +86,8 @@ sustituirán los anuncios de NVDA, JAWS o Narrador.
 ## Retoque fino por cuerda (cuartos de tono)
 
 Para el mapa técnico, las reglas de accesibilidad y las pruebas, consulta
-[DEVELOPMENT.md](DEVELOPMENT.md) y [estructura_proyecto.txt](estructura_proyecto.txt).
+[DEVELOPMENT.md](DEVELOPMENT.md), [estructura_proyecto.txt](estructura_proyecto.txt) y
+[AUDITORIA_EPUB_TTS.md](AUDITORIA_EPUB_TTS.md).
 
 Cada cuerda puede desplazarse de su nota diatónica de fábrica en pasos de cuarto de tono
 (50 cents), independientemente de las demás. Dos usos:
