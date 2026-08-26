@@ -46,4 +46,11 @@ Esta es una versión en validación. Las pruebas automáticas pasan, pero todav�
 debe probarse con instrumentos y dispositivos reales antes de declararla
 estable o moverla a main.
 
+Tus datos
+---------
+La configuración de audio y los ajustes de afinación se guardan por separado
+dentro de la carpeta "configuraciones". La aplicación crea copias de seguridad
+automáticas antes de los cambios reales y no borra el archivo antiguo al
+actualizar desde una versión anterior.
+
 — Dayanna Parson

@@ -215,12 +215,12 @@ los cents exactos de desviación (p. ej. "Sube un poco (+18 cents)").
 
 ## Ajustes persistentes
 
-El dispositivo de entrada, la tasa de muestreo, el tamaño de búfer, el instrumento, la
-cuerda seleccionada y las opciones de accesibilidad se guardan automáticamente en
-`configuraciones/ajustes.json` y se restauran al volver a abrir la aplicación. Antes de
-cada cambio real se conserva una copia de la versión anterior en
-`configuraciones/copias_ajustes/`; se mantienen las diez más recientes. Esto es
-independiente de la exportación manual de perfiles.
+La **configuración técnica** (dispositivo, Scarlett, WASAPI, calibración, sensibilidad y
+opciones de anuncios) se guarda en `configuraciones/configuracion_audio.json`. Los
+**ajustes de afinación** (instrumento, cuerda, escala, retoques y perfiles) se guardan en
+`configuraciones/ajustes_afinacion.json`. Ambos se restauran al abrir la aplicación y
+mantienen sus propias diez copias anteriores, en carpetas separadas. El antiguo
+`configuraciones/ajustes.json` se conserva intacto como respaldo de migración.
 
 ## Registros y diagnóstico de cierres
 

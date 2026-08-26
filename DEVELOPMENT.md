@@ -28,7 +28,7 @@ de forma autónoma, sin impedir una interfaz clara a quien ve.
 - `app/interfaz_gui.py`: compatibilidad temporal para importaciones antiguas.
 - `app/motor_audio.py`: captura, YIN y generación de tonos; no conoce widgets.
 - `app/afinaciones_maqam_lira.py`: afinaciones estáticas de la lira en 24-EDO.
-- `app/gestor_ajustes.py`: persistencia de preferencias del usuario.
+- `app/gestor_ajustes.py`: persistencia atómica separada de configuración técnica y ajustes musicales, con migración y copias rotativas.
 - `app/conector_nvda.py`: anuncios al lector de pantalla, con limitación de repeticiones.
 - `app/control_microfono.py`: comprobación opcional del silencio de Windows.
 
