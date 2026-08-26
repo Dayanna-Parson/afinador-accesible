@@ -139,6 +139,9 @@ y a la personalizada. Sikah incluye sus variantes Huzam, Iraq y Bastanigar.
 
 Patrones verificados contra la teoría estándar de intervalos en cuartos de tono.
 
+La guía ampliada, el catálogo de los 25 maqamat integrados, la metodología de
+adaptación y las fuentes están en [`documentos/maqamat/`](documentos/maqamat/LEEME.md).
+
 ### Guitarra: afinaciones alternativas estándar
 
 Drop D, Open G, Open D y DADGAD — todas bajan o mantienen la tensión de las cuerdas estándar,
@@ -271,6 +274,8 @@ en [`PRUEBAS_MANUALES_ACCESIBILIDAD.md`](PRUEBAS_MANUALES_ACCESIBILIDAD.md).
 - [`AUDITORIA_EPUB_TTS.md`](AUDITORIA_EPUB_TTS.md): patrones adaptados del otro
   proyecto y los que no corresponden aquí.
 - [`GUIA_SCRIPTS.md`](GUIA_SCRIPTS.md): qué hace cada archivo `.bat`.
+- [`documentos/maqamat/`](documentos/maqamat/LEEME.md): documentación musical,
+  técnica y de fuentes de las afinaciones árabes.
 
 ## Estado del proyecto
 
