@@ -9,3 +9,4 @@ Estas comprobaciones requieren una persona usuaria y no pueden sustituirse por p
 5. Cambia Do–Re–Mi por C–D–E y toca una nota conocida. Verifica que la nota detectada y el anuncio usan el formato elegido.
 6. Inicia escucha con el micrófono y con Scarlett. Comprueba dispositivo, canal, WASAPI si corresponde, aviso de señal y detener/reanudar escucha.
 7. Prueba con la escala de Windows al 100 %, 125 % y 150 %. Ningún control debe quedar inaccesible: la página debe desplazarse verticalmente.
+8. En cada afinación especial de la lira, pulsa `Ctrl+Mayús+P`. Debe anunciar el inicio, reproducir las 16 notas y volver a anunciar el final sin cerrar la aplicación. Si falla, conserva el archivo más reciente de `registros/errores/`.

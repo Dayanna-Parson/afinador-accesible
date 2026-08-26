@@ -25,8 +25,11 @@
   <h2>Perfiles personales y copia de seguridad</h2>
   <p>Un perfil guarda la afinación base y tus retoques por cuerda, separado para cada instrumento. Puedes cargarlo, renombrarlo o eliminarlo; los presets incluidos nunca se modifican. Al cerrar con retoques sin guardar, la aplicación pregunta si quieres guardarlos como perfil.</p>
   <p>“Exportar todos los perfiles” crea una copia JSON. “Importar perfiles desde copia” añade solo perfiles que no existan ya con ese nombre, para no sobrescribir tu trabajo.</p>
+  <p>Además, antes de cada cambio real de los ajustes generales se conserva la versión anterior en <code>configuraciones/copias_ajustes</code>. Se mantienen las diez últimas copias.</p>
   <h2>Nombres de notas y seguridad</h2>
   <p>En Audio y ajustes puedes elegir Do–Re–Mi o C–D–E. Solo cambia la presentación y los anuncios, nunca las frecuencias. Si subes una cuerda dos semitonos o más sobre su afinación estándar, aparece un aviso de tensión antes de continuar.</p>
+  <h2>Si la aplicación se cierra o algo falla</h2>
+  <p>El detalle técnico queda en <code>registros/afinador.log</code>. Cada error se guarda también por separado en <code>registros/errores</code>; adjunta el archivo más reciente al informar de un problema. La escucha previa registra la afinación y las frecuencias solicitadas antes de reproducirla.</p>
   <h2>Más ayuda</h2>
   <p>Consulta el README y DEVELOPMENT.md de la carpeta de la aplicación para los detalles técnicos. Pulsa <kbd>F1</kbd> en cualquier pestaña para volver a abrir esta ayuda.</p>
 </body>

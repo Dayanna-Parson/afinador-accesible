@@ -217,7 +217,18 @@ los cents exactos de desviación (p. ej. "Sube un poco (+18 cents)").
 
 El dispositivo de entrada, la tasa de muestreo, el tamaño de búfer, el instrumento, la
 cuerda seleccionada y las opciones de accesibilidad se guardan automáticamente en
-`configuraciones/ajustes.json` y se restauran al volver a abrir la aplicación.
+`configuraciones/ajustes.json` y se restauran al volver a abrir la aplicación. Antes de
+cada cambio real se conserva una copia de la versión anterior en
+`configuraciones/copias_ajustes/`; se mantienen las diez más recientes. Esto es
+independiente de la exportación manual de perfiles.
+
+## Registros y diagnóstico de cierres
+
+El registro detallado se guarda en `registros/afinador.log` y rota al alcanzar 2 MB
+(más tres archivos anteriores). Cada error o excepción tiene además un archivo propio
+en `registros/errores/`, donde se conservan los veinte más recientes. Si un controlador
+de audio provoca un cierre nativo, `registros/errores/fallo_nativo.log` conserva la
+traza disponible. Al informar de un fallo, comparte el último archivo de esa carpeta.
 
 ## Diagnóstico de nivel de entrada
 

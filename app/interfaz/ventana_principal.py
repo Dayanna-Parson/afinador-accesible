@@ -1216,24 +1216,37 @@ class VentanaPrincipal(wx.Frame):
     # ANCLAJE_FIN: REPETIR_INSTRUCCION_AFINACION
 
     def _al_escucha_previa_escala(self, evento):
-        instrumento = self.selector_instrumento.GetStringSelection()
-        preset = PRESETS_INSTRUMENTO.get(instrumento)
-        if not preset:
-            self.anunciador.hablar("No hay ninguna afinación que previsualizar en modo Cromático.")
-            return
-        frecuencias = []
-        for nombre_cuerda, indice_nota, octava in preset:
-            clave = "{}||{}".format(instrumento, nombre_cuerda)
-            cuartos_tono = self.retoques_escala_activa.get(clave, 0) + self.ajustes_finos_cuerdas.get(clave, 0)
-            frecuencias.append(frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono))
-        self.anunciador.hablar(
-            "Escucha previa de la afinación objetivo: {} cuerdas, desde la más grave a la más aguda."
-            .format(len(preset))
-        )
-        self.generador_tonos.reproducir_secuencia(
-            frecuencias,
-            al_finalizar=lambda: wx.CallAfter(self.anunciador.hablar, "Escucha previa terminada.")
-        )
+        try:
+            instrumento = self.selector_instrumento.GetStringSelection()
+            preset = PRESETS_INSTRUMENTO.get(instrumento)
+            if not preset:
+                self.anunciador.hablar("No hay ninguna afinación que previsualizar en modo Cromático.")
+                return
+            frecuencias = []
+            for nombre_cuerda, indice_nota, octava in preset:
+                clave = "{}||{}".format(instrumento, nombre_cuerda)
+                cuartos_tono = self.retoques_escala_activa.get(clave, 0) + self.ajustes_finos_cuerdas.get(clave, 0)
+                frecuencia = frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono)
+                if not isinstance(frecuencia, (float, int)) or frecuencia <= 0:
+                    raise ValueError("frecuencia no válida para {}: {!r}".format(nombre_cuerda, frecuencia))
+                frecuencias.append(frecuencia)
+            logger.info(
+                "escucha previa solicitada: instrumento=%s escala=%s cuerdas=%s frecuencias=%s",
+                instrumento, self.selector_escala.GetStringSelection(), len(preset), frecuencias,
+            )
+            self.anunciador.hablar(
+                "Escucha previa de la afinación objetivo: {} cuerdas, desde la más grave a la más aguda."
+                .format(len(preset))
+            )
+            self.generador_tonos.reproducir_secuencia(
+                frecuencias,
+                al_finalizar=lambda: wx.CallAfter(self.anunciador.hablar, "Escucha previa terminada.")
+            )
+        except Exception:
+            logger.exception("fallo al preparar la escucha previa de la afinación")
+            self.anunciador.hablar(
+                "No se pudo iniciar la escucha previa. El detalle se ha guardado en registros, errores."
+            )
 
     def _al_cambiar_dispositivo(self, evento):
         self._guardar_ajustes_actuales()

@@ -3,8 +3,10 @@
 import json
 import logging
 import os
+import shutil
+from datetime import datetime
 
-from app.config_rutas import RUTA_AJUSTES, RUTA_CONFIGURACIONES
+from app.config_rutas import RUTA_AJUSTES, RUTA_CONFIGURACIONES, RUTA_COPIAS_AJUSTES
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +54,43 @@ def cargar_ajustes():
     return ajustes
 
 
+MAXIMO_COPIAS_AJUSTES = 10
+
+
+def _contenido_json(ajustes):
+    return json.dumps(ajustes, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+
+
+def _crear_copia_ajustes_anterior():
+    """Guarda la versión anterior antes de sustituirla y conserva solo las diez últimas."""
+    if not os.path.isfile(RUTA_AJUSTES):
+        return
+    os.makedirs(RUTA_COPIAS_AJUSTES, exist_ok=True)
+    marca = datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss_%f")
+    destino = os.path.join(RUTA_COPIAS_AJUSTES, "ajustes_{}.json".format(marca))
+    shutil.copy2(RUTA_AJUSTES, destino)
+    copias = sorted(
+        nombre for nombre in os.listdir(RUTA_COPIAS_AJUSTES)
+        if nombre.startswith("ajustes_") and nombre.endswith(".json")
+    )
+    for nombre in copias[:-MAXIMO_COPIAS_AJUSTES]:
+        os.remove(os.path.join(RUTA_COPIAS_AJUSTES, nombre))
+
+
 def guardar_ajustes(ajustes):
-    """Escritura atómica: primero a un archivo temporal, luego renombrado sobre el destino."""
+    """Escritura atómica con historial recuperable de los diez cambios reales más recientes."""
     try:
         os.makedirs(RUTA_CONFIGURACIONES, exist_ok=True)
+        contenido_nuevo = _contenido_json(ajustes)
+        if os.path.isfile(RUTA_AJUSTES):
+            with open(RUTA_AJUSTES, "r", encoding="utf-8") as archivo:
+                if archivo.read() == contenido_nuevo:
+                    return
+            _crear_copia_ajustes_anterior()
         ruta_temporal = RUTA_AJUSTES + ".tmp"
         with open(ruta_temporal, "w", encoding="utf-8") as archivo:
-            json.dump(ajustes, archivo, ensure_ascii=False, indent=2)
+            archivo.write(contenido_nuevo)
         os.replace(ruta_temporal, RUTA_AJUSTES)
+        logger.info("ajustes guardados correctamente")
     except Exception:
         logger.exception("no se pudieron guardar los ajustes")
