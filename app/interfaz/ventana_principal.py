@@ -318,6 +318,14 @@ class VentanaPrincipal(wx.Frame):
             "Recupera el perfil seleccionado para el instrumento actual."
         )
         self.boton_cargar_afinacion.Bind(wx.EVT_BUTTON, self._al_cargar_afinacion_personal)
+        self.boton_renombrar_afinacion = wx.Button(self.pagina_afinaciones, label="Renombrar perfil seleccionado")
+        aplicar_icono_boton(self.boton_renombrar_afinacion, "editar")
+        self.boton_renombrar_afinacion.SetHelpText("Cambia solamente el nombre del perfil seleccionado.")
+        self.boton_renombrar_afinacion.Bind(wx.EVT_BUTTON, self._al_renombrar_afinacion_personal)
+        self.boton_eliminar_afinacion = wx.Button(self.pagina_afinaciones, label="Eliminar perfil seleccionado")
+        aplicar_icono_boton(self.boton_eliminar_afinacion, "eliminar")
+        self.boton_eliminar_afinacion.SetHelpText("Elimina el perfil seleccionado después de pedir confirmación.")
+        self.boton_eliminar_afinacion.Bind(wx.EVT_BUTTON, self._al_eliminar_afinacion_personal)
         self._organizar_pagina(
             self.pagina_afinaciones,
             ("Afinación seleccionada", (etiqueta_familia_maqam, self.selector_familia_maqam,
@@ -328,7 +336,8 @@ class VentanaPrincipal(wx.Frame):
                                               self.boton_subir_retoque, self.boton_bajar_retoque,
                                               self.boton_restablecer_retoque)),
             ("Perfiles personales", (etiqueta_guardadas, self.selector_afinacion_guardada,
-                                         self.boton_guardar_afinacion, self.boton_cargar_afinacion)),
+                                         self.boton_guardar_afinacion, self.boton_cargar_afinacion,
+                                         self.boton_renombrar_afinacion, self.boton_eliminar_afinacion)),
         )
 
         # Audio y ajustes: opciones que rara vez hay que tocar durante una sesión.
@@ -410,7 +419,8 @@ class VentanaPrincipal(wx.Frame):
                                        self.boton_escucha_previa, self.selector_paso_retoque,
                                        self.boton_subir_retoque, self.boton_bajar_retoque,
                                        self.boton_restablecer_retoque, self.selector_afinacion_guardada,
-                                       self.boton_guardar_afinacion, self.boton_cargar_afinacion),
+                                       self.boton_guardar_afinacion, self.boton_cargar_afinacion,
+                                       self.boton_renombrar_afinacion, self.boton_eliminar_afinacion),
             self.pagina_audio: (
                 self.selector_dispositivo, self.selector_canal, self.casilla_exclusivo_wasapi,
                 self.casilla_desmutear_microfono, self.selector_tasa, self.selector_buffer,
@@ -459,7 +469,10 @@ class VentanaPrincipal(wx.Frame):
             evento.Skip()
             return
         foco = wx.Window.FindFocus()
-        controles = self._controles_pestana.get(self.cuaderno.GetCurrentPage(), ())
+        controles = tuple(
+            control for control in self._controles_pestana.get(self.cuaderno.GetCurrentPage(), ())
+            if control.IsShown() and control.IsEnabled()
+        )
         # El cuaderno forma parte del recorrido. Antes se cerraba el círculo solo
         # entre controles de la página, con lo que Tab no podía llegar nunca a
         # las pestañas; Ctrl+1/2/3 quedaba como única vía de acceso.
@@ -883,13 +896,29 @@ class VentanaPrincipal(wx.Frame):
         if clave is None:
             self.anunciador.hablar("No hay ninguna cuerda seleccionada para retocar.")
             return
+        retoque_manual_previo = self.ajustes_finos_cuerdas.get(clave, 0)
+        desplazamiento_previo = self.retoques_escala_activa.get(clave, 0) + retoque_manual_previo
+        desplazamiento_nuevo = desplazamiento_previo + delta
+        # Dos semitonos por encima de la tensión estándar ya es una subida notable.
+        # No bloqueamos: la cuerda y el calibre pueden permitirlo, pero la decisión
+        # debe ser consciente, especialmente en instrumentos pequeños.
+        if desplazamiento_previo < 4 <= desplazamiento_nuevo:
+            respuesta = wx.MessageBox(
+                "Vas a subir esta cuerda dos semitonos o más respecto a su afinación estándar. "
+                "Puede aumentar mucho la tensión y romper la cuerda. ¿Quieres continuar?",
+                "Aviso de tensión de cuerda",
+                wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
+                self,
+            )
+            if respuesta != wx.YES:
+                self.anunciador.hablar("Ajuste cancelado para proteger la cuerda.")
+                return
         escala_actual = self.selector_escala.GetStringSelection()
         personalizada = NOMBRE_AFINACION_PERSONALIZADA_LIRA if instrumento == NOMBRE_LIRA else NOMBRE_AFINACION_PERSONALIZADA
         if escala_actual != personalizada:
             self.escala_base_personalizada[instrumento] = escala_actual
             self.selector_escala.SetStringSelection(personalizada)
             self._aplicar_retoques_escala_activa()
-        retoque_manual_previo = self.ajustes_finos_cuerdas.get(clave, 0)
         if not self._retoques_sin_guardar:
             self._retoques_antes_de_editar = dict(self.ajustes_finos_cuerdas)
             self._retoques_sin_guardar = True
@@ -1034,6 +1063,57 @@ class VentanaPrincipal(wx.Frame):
         self._guardar_ajustes_actuales()
         self.anunciador.reiniciar_estado()
         self.anunciador.hablar("Afinación cargada: {}.".format(nombre))
+
+    def _al_renombrar_afinacion_personal(self, evento):
+        instrumento = self.selector_instrumento.GetStringSelection()
+        nombre_anterior = self.selector_afinacion_guardada.GetStringSelection()
+        perfiles = self.perfiles_afinacion.get(instrumento, {})
+        if nombre_anterior not in perfiles:
+            self.anunciador.hablar("Selecciona primero un perfil que quieras renombrar.")
+            return
+        dialogo = wx.TextEntryDialog(
+            self, "Escribe el nuevo nombre del perfil.", "Renombrar perfil", value=nombre_anterior
+        )
+        try:
+            if dialogo.ShowModal() != wx.ID_OK:
+                return
+            nombre_nuevo = dialogo.GetValue().strip()
+        finally:
+            dialogo.Destroy()
+        if not nombre_nuevo:
+            self.anunciador.hablar("El perfil conserva su nombre porque no escribiste uno nuevo.")
+            return
+        if nombre_nuevo != nombre_anterior and nombre_nuevo in perfiles:
+            self.anunciador.hablar("Ya existe un perfil con ese nombre.")
+            return
+        if nombre_nuevo == nombre_anterior:
+            return
+        perfiles[nombre_nuevo] = perfiles.pop(nombre_anterior)
+        self._actualizar_lista_afinaciones_guardadas()
+        self.selector_afinacion_guardada.SetStringSelection(nombre_nuevo)
+        self._guardar_ajustes_actuales()
+        self.anunciador.hablar("Perfil renombrado a {}.".format(nombre_nuevo))
+
+    def _al_eliminar_afinacion_personal(self, evento):
+        instrumento = self.selector_instrumento.GetStringSelection()
+        nombre = self.selector_afinacion_guardada.GetStringSelection()
+        perfiles = self.perfiles_afinacion.get(instrumento, {})
+        if nombre not in perfiles:
+            self.anunciador.hablar("Selecciona primero un perfil que quieras eliminar.")
+            return
+        respuesta = wx.MessageBox(
+            "¿Eliminar definitivamente el perfil '{}'? Los presets incluidos no se borrarán.".format(nombre),
+            "Eliminar perfil de afinación",
+            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
+            self,
+        )
+        if respuesta != wx.YES:
+            self.anunciador.hablar("Eliminación cancelada.")
+            return
+        del perfiles[nombre]
+        self._actualizar_lista_afinaciones_guardadas()
+        self._guardar_ajustes_actuales()
+        self.anunciador.hablar("Perfil eliminado: {}.".format(nombre))
 
     def _al_deshacer_retoque(self, evento):
         if not self._historial_retoques:
