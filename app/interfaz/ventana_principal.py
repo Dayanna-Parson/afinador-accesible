@@ -747,7 +747,7 @@ class VentanaPrincipal(wx.Frame):
                 if not clave.startswith(prefijo)
             }
         escala_base = nombre_escala
-        if nombre_escala == NOMBRE_AFINACION_PERSONALIZADA:
+        if nombre_escala in (NOMBRE_AFINACION_PERSONALIZADA_LIRA, NOMBRE_AFINACION_PERSONALIZADA):
             escala_base = self.escala_base_personalizada.get(instrumento, next(iter(ESCALAS_POR_INSTRUMENTO[instrumento]), ""))
         desplazamientos = ESCALAS_POR_INSTRUMENTO.get(instrumento, {}).get(escala_base, {})
         self.retoques_escala_activa = {
