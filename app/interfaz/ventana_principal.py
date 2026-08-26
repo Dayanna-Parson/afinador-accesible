@@ -483,7 +483,7 @@ class VentanaPrincipal(wx.Frame):
         distribucion.Fit(pagina)
 
     def _al_navegacion_con_tab(self, evento):
-        """Atajos globales y recorrido de Tab que también deja alcanzar las pestañas."""
+        """Atajos globales y recorrido circular entre pestañas y controles."""
         tecla = evento.GetKeyCode()
         if tecla == wx.WXK_F1:
             self._abrir_ayuda()
@@ -495,10 +495,21 @@ class VentanaPrincipal(wx.Frame):
             self.cuaderno.SetSelection(tecla - ord("1"))
             wx.CallAfter(self.cuaderno.SetFocus)
             return
+        foco = wx.Window.FindFocus()
+        # wx.Notebook no cierra siempre el recorrido con las flechas: al llegar
+        # a un extremo puede mandar el foco al primer control de la página. Lo
+        # interceptamos para conservar el foco en las pestañas y volver de la
+        # última a la primera (y al revés).
+        if foco == self.cuaderno and tecla in (wx.WXK_LEFT, wx.WXK_RIGHT):
+            total_pestanas = self.cuaderno.GetPageCount()
+            if total_pestanas:
+                delta = -1 if tecla == wx.WXK_LEFT else 1
+                self.cuaderno.SetSelection((self.cuaderno.GetSelection() + delta) % total_pestanas)
+                wx.CallAfter(self.cuaderno.SetFocus)
+            return
         if tecla != wx.WXK_TAB or evento.ControlDown() or evento.AltDown():
             evento.Skip()
             return
-        foco = wx.Window.FindFocus()
         controles = tuple(
             control for control in self._controles_pestana.get(self.cuaderno.GetCurrentPage(), ())
             if control.IsShown() and control.IsEnabled()
@@ -514,7 +525,7 @@ class VentanaPrincipal(wx.Frame):
             return
         indice = next(
             (posicion for posicion, control in enumerate(controles)
-             if foco == control or control.IsDescendant(foco)),
+             if foco == control or (foco is not None and control.IsDescendant(foco))),
             None,
         )
         if indice is None:
