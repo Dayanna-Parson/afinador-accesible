@@ -3,7 +3,13 @@
 import math
 import unittest
 
-from app.interfaz.ventana_principal import ESCALAS_POR_INSTRUMENTO, NOMBRE_LIRA, PRESETS_INSTRUMENTO
+from app.interfaz.ventana_principal import (
+    ESCALAS_POR_INSTRUMENTO,
+    NOMBRE_GUITARRA,
+    NOMBRE_LIRA,
+    NOMBRE_UKELELE,
+    PRESETS_INSTRUMENTO,
+)
 from app.motor_audio import frecuencia_con_desplazamiento
 from app.afinaciones_maqam_lira import (
     AFINACIONES_LIRA_MAQAM_24EDO,
@@ -53,3 +59,28 @@ class PruebasMaqamatLira(unittest.TestCase):
             with self.subTest(maqam=nombre_maqam):
                 esperado = calcular_retoques_referencia_lira(cuerdas, tonica, cents_tonica, grados)
                 self.assertEqual(AFINACIONES_LIRA_MAQAM_24EDO[nombre_maqam], esperado)
+
+
+class PruebasAfinacionesEstandar(unittest.TestCase):
+    """Las afinaciones occidentales deben partir siempre de notas inequívocas."""
+
+    def test_guitarra_estandar_es_mi_la_re_sol_si_mi(self):
+        self.assertEqual(
+            PRESETS_INSTRUMENTO[NOMBRE_GUITARRA],
+            [
+                ("Cuerda 6 (Mi)", 4, 2), ("Cuerda 5 (La)", 9, 2),
+                ("Cuerda 4 (Re)", 2, 3), ("Cuerda 3 (Sol)", 7, 3),
+                ("Cuerda 2 (Si)", 11, 3), ("Cuerda 1 (Mi)", 4, 4),
+            ],
+        )
+        self.assertEqual(ESCALAS_POR_INSTRUMENTO[NOMBRE_GUITARRA]["Estándar (Mi La Re Sol Si Mi)"], {})
+
+    def test_ukelele_estandar_es_sol_do_mi_la(self):
+        self.assertEqual(
+            PRESETS_INSTRUMENTO[NOMBRE_UKELELE],
+            [
+                ("Cuerda 1 (Sol)", 7, 4), ("Cuerda 2 (Do)", 0, 4),
+                ("Cuerda 3 (Mi)", 4, 4), ("Cuerda 4 (La)", 9, 4),
+            ],
+        )
+        self.assertEqual(ESCALAS_POR_INSTRUMENTO[NOMBRE_UKELELE]["Estándar (Sol Do Mi La, reentrante)"], {})

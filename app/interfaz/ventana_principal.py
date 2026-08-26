@@ -405,7 +405,7 @@ class VentanaPrincipal(wx.Frame):
         distribucion.Fit(pagina)
 
     def _al_navegacion_con_tab(self, evento):
-        """Atajos globales seguros; las flechas nunca cambian el foco de pestaña."""
+        """Atajos globales y recorrido de Tab que también deja alcanzar las pestañas."""
         tecla = evento.GetKeyCode()
         if tecla == wx.WXK_F1:
             self._abrir_ayuda()
@@ -420,8 +420,17 @@ class VentanaPrincipal(wx.Frame):
         if tecla != wx.WXK_TAB or evento.ControlDown() or evento.AltDown():
             evento.Skip()
             return
-        controles = self._controles_pestana.get(self.cuaderno.GetCurrentPage(), ())
         foco = wx.Window.FindFocus()
+        controles = self._controles_pestana.get(self.cuaderno.GetCurrentPage(), ())
+        # El cuaderno forma parte del recorrido. Antes se cerraba el círculo solo
+        # entre controles de la página, con lo que Tab no podía llegar nunca a
+        # las pestañas; Ctrl+1/2/3 quedaba como única vía de acceso.
+        if foco == self.cuaderno:
+            if controles:
+                controles[-1 if evento.ShiftDown() else 0].SetFocus()
+                return
+            evento.Skip()
+            return
         indice = next(
             (posicion for posicion, control in enumerate(controles)
              if foco == control or control.IsDescendant(foco)),
@@ -430,8 +439,13 @@ class VentanaPrincipal(wx.Frame):
         if indice is None:
             evento.Skip()
             return
-        paso = -1 if evento.ShiftDown() else 1
-        controles[(indice + paso) % len(controles)].SetFocus()
+        if evento.ShiftDown() and indice == 0:
+            self.cuaderno.SetFocus()
+            return
+        if not evento.ShiftDown() and indice == len(controles) - 1:
+            self.cuaderno.SetFocus()
+            return
+        controles[indice - 1 if evento.ShiftDown() else indice + 1].SetFocus()
 
     def _abrir_ayuda(self):
         """Abre la ayuda local con el navegador predeterminado, sin bloquear el afinador."""
@@ -601,9 +615,15 @@ class VentanaPrincipal(wx.Frame):
             self.selector_cuerda.Enable()
 
         instrumento = self.selector_instrumento.GetStringSelection()
-        self.selector_familia_maqam.Enable(instrumento == NOMBRE_LIRA)
-        for control in (self.selector_afinacion_guardada, self.boton_guardar_afinacion, self.boton_cargar_afinacion):
-            control.Enable(instrumento == NOMBRE_LIRA)
+        es_lira = instrumento == NOMBRE_LIRA
+        self.selector_familia_maqam.Enable(es_lira)
+        for control in (
+            self.selector_afinacion_guardada, self.boton_guardar_afinacion,
+            self.boton_cargar_afinacion, self.selector_paso_retoque,
+            self.boton_subir_retoque, self.boton_bajar_retoque,
+            self.boton_restablecer_retoque,
+        ):
+            control.Enable(es_lira)
         self._actualizar_lista_afinaciones_guardadas()
         self._actualizar_opciones_escala()
 
@@ -770,7 +790,15 @@ class VentanaPrincipal(wx.Frame):
         clave = self._clave_ajuste_fino()
         if clave is None:
             return 0
-        return self.retoques_escala_activa.get(clave, 0) + self.ajustes_finos_cuerdas.get(clave, 0)
+        # Solo la lira admite retoques por cuerda. Las afinaciones alternativas
+        # de guitarra y ukelele se describen ya en la escala elegida; ningún
+        # ajuste antiguo puede convertir su afinación estándar en otra cosa.
+        retoque_manual = (
+            self.ajustes_finos_cuerdas.get(clave, 0)
+            if self.selector_instrumento.GetStringSelection() == NOMBRE_LIRA
+            else 0
+        )
+        return self.retoques_escala_activa.get(clave, 0) + retoque_manual
 
     def _frecuencia_objetivo_actual(self):
         """Frecuencia real de la cuerda seleccionada, incluyendo el retoque fino en cuartos
@@ -782,6 +810,9 @@ class VentanaPrincipal(wx.Frame):
         return frecuencia_con_desplazamiento(indice_nota, octava, self._cuartos_tono_actual())
 
     def _desplazar_cuarto_tono(self, delta):
+        if self.selector_instrumento.GetStringSelection() != NOMBRE_LIRA:
+            self.anunciador.hablar("Los retoques manuales son solo para la lira.")
+            return
         clave = self._clave_ajuste_fino()
         if clave is None:
             self.anunciador.hablar("No hay ninguna cuerda seleccionada para retocar.")
@@ -819,6 +850,9 @@ class VentanaPrincipal(wx.Frame):
         self._desplazar_cuarto_tono(-self._paso_retoque_seleccionado())
 
     def _al_restablecer_ajuste_fino(self, evento):
+        if self.selector_instrumento.GetStringSelection() != NOMBRE_LIRA:
+            self.anunciador.hablar("Los retoques manuales son solo para la lira.")
+            return
         clave = self._clave_ajuste_fino()
         if clave is None or clave not in self.ajustes_finos_cuerdas:
             self.anunciador.hablar("Esta cuerda no tiene ningún ajuste manual que restablecer.")
