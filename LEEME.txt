@@ -1,0 +1,49 @@
+AfinadorAccesible — léeme primero
+=================================
+
+Gracias por descargar AfinadorAccesible.
+
+Cómo empezar
+------------
+1. Si has descargado el código fuente, ejecuta INSTALAR_AFINADOR.bat una sola
+   vez. Instala las dependencias de Python en un entorno propio de la app.
+2. Después ejecuta INICIAR_AFINADOR.bat para abrir el afinador.
+3. Dentro de la aplicación, pulsa F1 para abrir el manual completo.
+
+No necesitas instalar Rust para afinar. El motor Rust es opcional y el
+afinador funciona con el motor Python incluido.
+
+Qué puedo afinar
+----------------
+- Lira Aklot de 16 cuerdas: afinación de fábrica y adaptaciones de maqam.
+- Guitarra acústica o electroclásica: estándar, Drop D, DADGAD, Open D y Open G.
+- Ukelele soprano con cuerdas normales: Sol-Do-Mi-La reentrante estándar.
+
+Antes de empezar
+----------------
+- Conecta el micrófono o la Scarlett y selecciónalo en «Audio y ajustes».
+- Si tu portátil aplica cancelación de ruido por IA, desactívala: suele filtrar
+  el sonido de los instrumentos.
+- Para una Scarlett 2i2, elige entrada 1, entrada 2 o automática según dónde
+  conectes el instrumento.
+
+Accesibilidad
+-------------
+La aplicación se usa por completo con teclado. Tab y Mayús+Tab recorren los
+controles disponibles; Ctrl+1, Ctrl+2 y Ctrl+3 cambian de pestaña. Los iconos
+son solo apoyo visual: toda información importante tiene texto y anuncio
+compatible con NVDA, JAWS y Narrador.
+
+Ayuda y problemas
+-----------------
+Si algo falla, conserva el texto de error y consulta ayuda.html. Antes de
+informar de un problema de afinación, indica el instrumento, la afinación
+seleccionada, el dispositivo de entrada y si usas auriculares o Scarlett.
+
+Estado actual
+-------------
+Esta es una versión en validación. Las pruebas automáticas pasan, pero todavía
+debe probarse con instrumentos y dispositivos reales antes de declararla
+estable o moverla a main.
+
+— Dayanna Parson

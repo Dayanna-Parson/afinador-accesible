@@ -7,6 +7,10 @@ Afinador cromático de escritorio para Windows, accesible por diseño para perso
 - Python 3.12+
 - Windows (para la integración con lectores de pantalla vía `accessible_output3`)
 
+Las dependencias exactas y sus versiones mínimas están en
+[`requisitos.txt`](requisitos.txt). Rust **no** es un requisito para usar la
+aplicación: solo sirve para compilar el motor alternativo opcional.
+
 ### Ajuste imprescindible en portátiles con reducción de ruido por IA
 
 Si el portátil tiene una función de "Cancelación de ruido del micrófono" (Lenovo Vantage,
@@ -238,6 +242,33 @@ aplica en modo Cromático, que no tiene una secuencia de cuerdas).
 python -m unittest discover -s tests -v
 ```
 
+Además de estas pruebas automáticas, antes de distribuir una versión deben
+realizarse las comprobaciones de teclado, NVDA y dispositivos reales indicadas
+en [`PRUEBAS_MANUALES_ACCESIBILIDAD.md`](PRUEBAS_MANUALES_ACCESIBILIDAD.md).
+
+## Documentación
+
+- [`LEEME.txt`](LEEME.txt): punto de partida para quien descarga la aplicación.
+- [`ayuda.html`](ayuda.html): manual de uso local; también se abre con `F1`.
+- [`DEVELOPMENT.md`](DEVELOPMENT.md): arquitectura, reglas técnicas y pruebas.
+- [`BITACORA_DE_DESARROLLO.md`](BITACORA_DE_DESARROLLO.md): historia y decisiones
+  del proyecto.
+- [`documentos/Fases_Del_Proyecto/VISION_PERSONAL.md`](documentos/Fases_Del_Proyecto/VISION_PERSONAL.md):
+  propósito y criterios que no se deben perder al evolucionar la aplicación.
+- [`PRUEBAS_MANUALES_ACCESIBILIDAD.md`](PRUEBAS_MANUALES_ACCESIBILIDAD.md): lista
+  de validación previa a una publicación.
+- [`AUDITORIA_EPUB_TTS.md`](AUDITORIA_EPUB_TTS.md): patrones adaptados del otro
+  proyecto y los que no corresponden aquí.
+- [`GUIA_SCRIPTS.md`](GUIA_SCRIPTS.md): qué hace cada archivo `.bat`.
+
+## Estado del proyecto
+
+La rama `review-claude` contiene una versión funcional con pruebas unitarias de
+la lógica musical, perfiles y audio. Aún no debe considerarse una versión
+estable de distribución hasta completar las pruebas manuales con NVDA, la
+lira, guitarra, ukelele y los dispositivos de entrada reales. La rama `main`
+permanece sin tocar durante esa validación.
+
 ## Estructura
 
 ```
@@ -256,6 +287,8 @@ tests/                  # Pruebas del algoritmo YIN y la lógica de notas/instru
 iniciar_afinador.py     # Punto de entrada
 requisitos.txt          # Dependencias de Python
 INICIAR_AFINADOR.bat    # Lanzador para Windows
+INSTALAR_AFINADOR.bat   # Instalación guiada de las dependencias
+documentos/             # Visión y documentación de planificación
 ```
 
 ## Instrumentos soportados
