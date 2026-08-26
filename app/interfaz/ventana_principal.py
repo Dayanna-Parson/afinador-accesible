@@ -47,6 +47,7 @@ TEXTOS_INSTRUCCION = {
 
 NOMBRES_NOTAS_BEMOLES = ["Do", "Re bemol", "Re", "Mi bemol", "Mi", "Fa", "Sol bemol", "Sol", "La bemol", "La", "Si bemol", "Si"]
 NOMBRES_NOTAS_SOSTENIDOS = ["Do", "Do sostenido", "Re", "Re sostenido", "Mi", "Fa", "Fa sostenido", "Sol", "Sol sostenido", "La", "La sostenido", "Si"]
+NOMBRES_NOTAS_AMERICANOS = ["C", "C sostenido", "D", "D sostenido", "E", "F", "F sostenido", "G", "G sostenido", "A", "A sostenido", "B"]
 
 # índice de nota cromática: 0=Do, 1=Do#, 2=Re, 3=Re#, 4=Mi, 5=Fa, 6=Fa#, 7=Sol, 8=Sol#, 9=La, 10=La#, 11=Si
 CROMATICO = "Cromático (cualquier nota)"
@@ -134,7 +135,7 @@ class VentanaPrincipal(wx.Frame):
     """Ventana raíz del afinador. Controles nativos wx, accesibles por defecto."""
 
     def __init__(self):
-        super().__init__(None, title="Afinador Accesible", size=(680, 760))
+        super().__init__(None, title="Afinador Accesible", size=(760, 780))
         self.SetMinSize((520, 520))
 
         self.ajustes = cargar_ajustes()
@@ -208,6 +209,19 @@ class VentanaPrincipal(wx.Frame):
         self.etiqueta_nota = wx.StaticText(self.pagina_afinar, label="Nota detectada: —")
         self.etiqueta_instruccion = wx.StaticText(self.pagina_afinar, label="Instrucción: —")
         self.etiqueta_nivel = wx.StaticText(self.pagina_afinar, label="Nivel de entrada: —")
+        self.indicador_desviacion = wx.Gauge(self.pagina_afinar, range=100, style=wx.GA_HORIZONTAL)
+        self.indicador_desviacion.SetValue(50)
+        self.indicador_desviacion.SetHelpText("Indicador visual de desviación: izquierda baja, centro afinada, derecha sube.")
+        self.etiqueta_visual_afinacion = wx.StaticText(
+            self.pagina_afinar, label="Indicador visual: esperando una nota"
+        )
+        fuente_indicador = self.etiqueta_visual_afinacion.GetFont()
+        fuente_indicador.SetPointSize(fuente_indicador.GetPointSize() + 2)
+        fuente_indicador.SetWeight(wx.FONTWEIGHT_BOLD)
+        self.etiqueta_visual_afinacion.SetFont(fuente_indicador)
+        etiqueta_escala_visual = wx.StaticText(
+            self.pagina_afinar, label="Baja la tensión   ←   AFINADA   →   Sube la tensión"
+        )
         self.boton_escucha = wx.Button(self.pagina_afinar, label="Iniciar escucha (Ctrl+E)")
         aplicar_icono_boton(self.boton_escucha, "afinar", fijar_nombre=False)
         self.boton_escucha.SetHelpText("Inicia o detiene la escucha del micrófono.")
@@ -239,6 +253,7 @@ class VentanaPrincipal(wx.Frame):
             ("Instrumento y cuerda", (self.selector_instrumento, etiqueta_cuerda,
                                         self.selector_cuerda, self.casilla_deteccion_automatica_cuerda)),
             ("Durante la afinación", (self.etiqueta_nota, self.etiqueta_instruccion, self.etiqueta_nivel,
+                                         self.etiqueta_visual_afinacion, self.indicador_desviacion, etiqueta_escala_visual,
                                          self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia)),
             ("Comportamiento", (self.casilla_avance_automatico, self.casilla_pitido_confirmacion,
                                  self.casilla_modo_solo_escucha)),
@@ -364,6 +379,14 @@ class VentanaPrincipal(wx.Frame):
         self.selector_verbosidad = wx.Choice(self.pagina_audio, choices=["Conciso", "Detallado (con cents exactos)"])
         self.selector_verbosidad.SetSelection(0)
         self.selector_verbosidad.Bind(wx.EVT_CHOICE, self._al_cambiar_ajuste_simple)
+        self.selector_nomenclatura = wx.RadioBox(
+            self.pagina_audio, label="Nombres de las notas", choices=["Do, Re, Mi", "C, D, E (cifrado americano)"],
+            majorDimension=1, style=wx.RA_SPECIFY_ROWS,
+        )
+        self.selector_nomenclatura.SetHelpText(
+            "Cambia cómo se muestran y se verbalizan las notas detectadas y objetivo. No altera frecuencias ni afinaciones."
+        )
+        self.selector_nomenclatura.Bind(wx.EVT_RADIOBOX, self._al_cambiar_nomenclatura)
         self._organizar_pagina(
             self.pagina_audio,
             ("Entrada de audio", (etiqueta_dispositivo, self.selector_dispositivo, etiqueta_canal,
@@ -373,7 +396,7 @@ class VentanaPrincipal(wx.Frame):
                                       self.selector_buffer, etiqueta_ganancia, self.control_ganancia,
                                       etiqueta_sensibilidad, self.control_sensibilidad)),
             ("Referencia e indicaciones", (etiqueta_la4, self.control_la4, etiqueta_verbosidad,
-                                            self.selector_verbosidad)),
+                                            self.selector_verbosidad, self.selector_nomenclatura)),
         )
         principal.Add(self.cuaderno, 1, wx.EXPAND | wx.ALL, 8)
         self.SetSizer(principal)
@@ -392,6 +415,7 @@ class VentanaPrincipal(wx.Frame):
                 self.selector_dispositivo, self.selector_canal, self.casilla_exclusivo_wasapi,
                 self.casilla_desmutear_microfono, self.selector_tasa, self.selector_buffer,
                 self.control_ganancia, self.control_sensibilidad, self.control_la4, self.selector_verbosidad,
+                self.selector_nomenclatura,
             ),
         }
         self.Bind(wx.EVT_CHAR_HOOK, self._al_navegacion_con_tab)
@@ -543,6 +567,9 @@ class VentanaPrincipal(wx.Frame):
             bool(self.ajustes.get("deteccion_automatica_cuerda", False))
         )
         self.selector_verbosidad.SetSelection(1 if self.ajustes.get("instrucciones_detalladas", False) else 0)
+        self.selector_nomenclatura.SetSelection(
+            1 if self.ajustes.get("nomenclatura_notas") == "americano" else 0
+        )
 
         familia_maqam = self.ajustes.get("familia_maqam")
         if familia_maqam and self.selector_familia_maqam.FindString(familia_maqam) != wx.NOT_FOUND:
@@ -585,6 +612,7 @@ class VentanaPrincipal(wx.Frame):
             "modo_solo_escucha": self.casilla_modo_solo_escucha.GetValue(),
             "deteccion_automatica_cuerda": self.casilla_deteccion_automatica_cuerda.GetValue(),
             "instrucciones_detalladas": self.selector_verbosidad.GetSelection() == 1,
+            "nomenclatura_notas": "americano" if self.selector_nomenclatura.GetSelection() == 1 else "solfeo",
             "escala": self.selector_escala.GetStringSelection() or None,
             "familia_maqam": self.selector_familia_maqam.GetStringSelection() or "Todas las familias",
             "perfiles_afinacion": self.perfiles_afinacion,
@@ -615,6 +643,23 @@ class VentanaPrincipal(wx.Frame):
     def _preset_actual(self):
         nombre_instrumento = self.selector_instrumento.GetStringSelection()
         return PRESETS_INSTRUMENTO.get(nombre_instrumento)
+
+    def _nombres_notas_actuales(self):
+        return NOMBRES_NOTAS_AMERICANOS if self.selector_nomenclatura.GetSelection() == 1 else NOMBRES_NOTAS_SOSTENIDOS
+
+    def _formatear_nota(self, indice_nota, octava):
+        """Nombre visible y verbalizable; el cálculo musical sigue siendo numérico."""
+        return "{} {}".format(self._nombres_notas_actuales()[indice_nota % 12], octava)
+
+    def _al_cambiar_nomenclatura(self, evento):
+        self._guardar_ajustes_actuales()
+        self._actualizar_contexto_afinacion()
+        self.anunciador.hablar(
+            "Nombres de las notas: {}.".format(
+                "cifrado americano" if self.selector_nomenclatura.GetSelection() == 1 else "Do Re Mi"
+            )
+        )
+        evento.Skip()
 
     def _al_cambiar_instrumento(self, evento):
         preset = self._preset_actual()
@@ -788,11 +833,11 @@ class VentanaPrincipal(wx.Frame):
         octava_objetivo = octava + indice_en_cuartos // 24
         posicion_en_octava = indice_en_cuartos % 24
         if posicion_en_octava % 2 == 0:
-            nombre = NOMBRES_NOTAS_BEMOLES[posicion_en_octava // 2]
+            nombre = self._nombres_notas_actuales()[posicion_en_octava // 2]
         elif cuartos_tono < 0:
-            nombre = NOMBRES_NOTAS_BEMOLES[(posicion_en_octava + 1) // 2] + " medio bemol"
+            nombre = self._nombres_notas_actuales()[((posicion_en_octava + 1) // 2) % 12] + " medio bemol"
         else:
-            nombre = NOMBRES_NOTAS_SOSTENIDOS[(posicion_en_octava - 1) // 2] + " medio sostenido"
+            nombre = self._nombres_notas_actuales()[((posicion_en_octava - 1) // 2) % 12] + " medio sostenido"
         return "Objetivo de esta cuerda: {} {}.".format(nombre, octava_objetivo)
 
     def _cuerda_objetivo(self):
@@ -1149,7 +1194,16 @@ class VentanaPrincipal(wx.Frame):
         self.etiqueta_nota.SetLabel("Nota detectada: —")
         self.etiqueta_instruccion.SetLabel("Instrucción: —")
         self.etiqueta_nivel.SetLabel("Nivel de entrada: —")
+        self._actualizar_indicador_visual(None, "Esperando una nota")
         self._ultima_instruccion_afinacion = None
+
+    def _actualizar_indicador_visual(self, cents, texto_estado):
+        """Actualiza una barra con texto; nunca depende solo del color."""
+        if cents is None:
+            self.indicador_desviacion.SetValue(50)
+        else:
+            self.indicador_desviacion.SetValue(max(0, min(100, int(round(cents)) + 50)))
+        self.etiqueta_visual_afinacion.SetLabel("Indicador visual: {}".format(texto_estado))
 
     def _comprobar_senal_de_audio(self):
         if self.capturador is None:
@@ -1245,6 +1299,7 @@ class VentanaPrincipal(wx.Frame):
         if resultado is None:
             self.etiqueta_nota.SetLabel("Nota detectada: —")
             self.etiqueta_instruccion.SetLabel("Instrucción: —")
+            self._actualizar_indicador_visual(None, "sin nota estable")
             # Una cuerda pulsada decae: el nivel sube y baja constantemente entre "hay nota"
             # y "no hay nada" en fracciones de segundo, aunque la nota siga sonando. Reiniciar
             # el estado del anunciador en cada hueco así de breve nunca deja acumular los 350 ms
@@ -1285,7 +1340,9 @@ class VentanaPrincipal(wx.Frame):
         if self.selector_verbosidad.GetSelection() == 1 and instruccion is not None:
             texto_instruccion = "{} ({:+.0f} cents)".format(texto_instruccion, cents)
 
-        texto_nota = "Nota detectada: {}{}".format(resultado["nombre"], resultado["octava"])
+        texto_nota = "Nota detectada: {}".format(
+            self._formatear_nota(resultado["indice_nota"], resultado["octava"])
+        )
         if self.selector_verbosidad.GetSelection() == 1:
             texto_nota += " ({:+.0f} cents)".format(cents)
         self.etiqueta_nota.SetLabel(texto_nota)
@@ -1301,13 +1358,15 @@ class VentanaPrincipal(wx.Frame):
             # Solo dice la nota que suena, sin instrucciones de sube/baja ni confirmación de
             # afinada: para quien solo quiere identificar por oído lo que está tocando.
             self.etiqueta_instruccion.SetLabel("Instrucción: — (modo solo escucha)")
+            self._actualizar_indicador_visual(cents, "nota detectada; modo solo escucha")
             self._ultima_instruccion_afinacion = None
             self.anunciador.procesar_instruccion(
-                "{}{}".format(resultado["nombre"], resultado["octava"])
+                self._formatear_nota(resultado["indice_nota"], resultado["octava"])
             )
             return
 
         self.etiqueta_instruccion.SetLabel("Instrucción: {}".format(texto_instruccion))
+        self._actualizar_indicador_visual(cents, texto_instruccion)
         self._ultima_instruccion_afinacion = texto_instruccion
 
         if instruccion != "AFINADA":

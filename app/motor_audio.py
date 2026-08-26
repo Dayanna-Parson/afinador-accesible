@@ -94,6 +94,7 @@ def frecuencia_a_nota(frecuencia):
     octava = 4 + (semitonos_redondeados + INDICE_LA) // 12
     return {
         "nombre": NOMBRES_NOTAS[indice_nota],
+        "indice_nota": indice_nota,
         "octava": octava,
         "frecuencia": frecuencia,
         "frecuencia_objetivo": frecuencia_objetivo,

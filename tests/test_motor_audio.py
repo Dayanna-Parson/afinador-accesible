@@ -104,6 +104,11 @@ class PruebasConversionNotas(unittest.TestCase):
     def test_la4_es_440hz(self):
         self.assertAlmostEqual(nota_a_frecuencia(9, 4), 440.0, places=5)
 
+    def test_la_nota_detectada_incluye_indice_neutro(self):
+        resultado = frecuencia_a_nota(440.0)
+        self.assertEqual(resultado["indice_nota"], 9)
+        self.assertEqual(resultado["octava"], 4)
+
     def test_ida_y_vuelta_frecuencia_nota(self):
         for indice in range(12):
             for octava in (2, 3, 4, 5):

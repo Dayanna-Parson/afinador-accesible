@@ -34,6 +34,7 @@ AJUSTES_POR_DEFECTO = {
     "afinaciones_guardadas_lira": {},
     "perfiles_afinacion": {},
     "escala_base_personalizada": {},
+    "nomenclatura_notas": "solfeo",
 }
 
 
