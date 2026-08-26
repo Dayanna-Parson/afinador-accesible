@@ -1,5 +1,6 @@
 """Ventana principal accesible del afinador cromático."""
 
+import json
 import logging
 import statistics
 import time
@@ -326,6 +327,14 @@ class VentanaPrincipal(wx.Frame):
         aplicar_icono_boton(self.boton_eliminar_afinacion, "eliminar")
         self.boton_eliminar_afinacion.SetHelpText("Elimina el perfil seleccionado después de pedir confirmación.")
         self.boton_eliminar_afinacion.Bind(wx.EVT_BUTTON, self._al_eliminar_afinacion_personal)
+        self.boton_exportar_perfiles = wx.Button(self.pagina_afinaciones, label="Exportar todos los perfiles...")
+        aplicar_icono_boton(self.boton_exportar_perfiles, "guardar")
+        self.boton_exportar_perfiles.SetHelpText("Guarda una copia de seguridad de todos los perfiles en un archivo JSON.")
+        self.boton_exportar_perfiles.Bind(wx.EVT_BUTTON, self._al_exportar_perfiles)
+        self.boton_importar_perfiles = wx.Button(self.pagina_afinaciones, label="Importar perfiles desde copia...")
+        aplicar_icono_boton(self.boton_importar_perfiles, "cargar")
+        self.boton_importar_perfiles.SetHelpText("Añade perfiles de una copia sin reemplazar perfiles con el mismo nombre.")
+        self.boton_importar_perfiles.Bind(wx.EVT_BUTTON, self._al_importar_perfiles)
         self._organizar_pagina(
             self.pagina_afinaciones,
             ("Afinación seleccionada", (etiqueta_familia_maqam, self.selector_familia_maqam,
@@ -337,7 +346,8 @@ class VentanaPrincipal(wx.Frame):
                                               self.boton_restablecer_retoque)),
             ("Perfiles personales", (etiqueta_guardadas, self.selector_afinacion_guardada,
                                          self.boton_guardar_afinacion, self.boton_cargar_afinacion,
-                                         self.boton_renombrar_afinacion, self.boton_eliminar_afinacion)),
+                                         self.boton_renombrar_afinacion, self.boton_eliminar_afinacion,
+                                         self.boton_exportar_perfiles, self.boton_importar_perfiles)),
         )
 
         # Audio y ajustes: opciones que rara vez hay que tocar durante una sesión.
@@ -420,7 +430,8 @@ class VentanaPrincipal(wx.Frame):
                                        self.boton_subir_retoque, self.boton_bajar_retoque,
                                        self.boton_restablecer_retoque, self.selector_afinacion_guardada,
                                        self.boton_guardar_afinacion, self.boton_cargar_afinacion,
-                                       self.boton_renombrar_afinacion, self.boton_eliminar_afinacion),
+                                       self.boton_renombrar_afinacion, self.boton_eliminar_afinacion,
+                                       self.boton_exportar_perfiles, self.boton_importar_perfiles),
             self.pagina_audio: (
                 self.selector_dispositivo, self.selector_canal, self.casilla_exclusivo_wasapi,
                 self.casilla_desmutear_microfono, self.selector_tasa, self.selector_buffer,
@@ -692,7 +703,9 @@ class VentanaPrincipal(wx.Frame):
             self.selector_afinacion_guardada, self.boton_guardar_afinacion,
             self.boton_cargar_afinacion, self.selector_paso_retoque,
             self.boton_subir_retoque, self.boton_bajar_retoque,
-            self.boton_restablecer_retoque,
+            self.boton_restablecer_retoque, self.boton_renombrar_afinacion,
+            self.boton_eliminar_afinacion, self.boton_exportar_perfiles,
+            self.boton_importar_perfiles,
         ):
             control.Enable(instrumento != CROMATICO)
         self._actualizar_lista_afinaciones_guardadas()
@@ -1114,6 +1127,68 @@ class VentanaPrincipal(wx.Frame):
         self._actualizar_lista_afinaciones_guardadas()
         self._guardar_ajustes_actuales()
         self.anunciador.hablar("Perfil eliminado: {}.".format(nombre))
+
+    def _al_exportar_perfiles(self, evento):
+        dialogo = wx.FileDialog(
+            self, "Exportar perfiles de afinación", wildcard="Archivos JSON (*.json)|*.json",
+            defaultFile="perfiles_afinador_accesible.json", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
+        )
+        try:
+            if dialogo.ShowModal() != wx.ID_OK:
+                return
+            ruta = dialogo.GetPath()
+        finally:
+            dialogo.Destroy()
+        try:
+            with open(ruta, "w", encoding="utf-8") as archivo:
+                json.dump({"formato": 1, "perfiles_afinacion": self.perfiles_afinacion}, archivo,
+                          ensure_ascii=False, indent=2)
+        except Exception:
+            logger.exception("no se pudieron exportar los perfiles")
+            self.anunciador.hablar("No se pudo exportar la copia de perfiles.")
+            return
+        self.anunciador.hablar("Copia de perfiles exportada correctamente.")
+
+    def _al_importar_perfiles(self, evento):
+        dialogo = wx.FileDialog(
+            self, "Importar perfiles de afinación", wildcard="Archivos JSON (*.json)|*.json",
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        )
+        try:
+            if dialogo.ShowModal() != wx.ID_OK:
+                return
+            ruta = dialogo.GetPath()
+        finally:
+            dialogo.Destroy()
+        try:
+            with open(ruta, "r", encoding="utf-8") as archivo:
+                contenido = json.load(archivo)
+            perfiles_importados = contenido.get("perfiles_afinacion", contenido)
+            if not isinstance(perfiles_importados, dict):
+                raise ValueError("el archivo no contiene perfiles válidos")
+        except Exception:
+            logger.exception("no se pudieron importar los perfiles")
+            self.anunciador.hablar("No se pudo leer esa copia de perfiles.")
+            return
+        anadidos = 0
+        omitidos = 0
+        for instrumento, perfiles in perfiles_importados.items():
+            if instrumento not in PRESETS_INSTRUMENTO or not isinstance(perfiles, dict):
+                omitidos += len(perfiles) if isinstance(perfiles, dict) else 1
+                continue
+            destino = self.perfiles_afinacion.setdefault(instrumento, {})
+            for nombre, datos in perfiles.items():
+                if nombre in destino or not isinstance(datos, dict):
+                    omitidos += 1
+                    continue
+                destino[nombre] = datos
+                anadidos += 1
+        self._actualizar_lista_afinaciones_guardadas()
+        self._guardar_ajustes_actuales()
+        self.anunciador.hablar(
+            "Importación terminada: {} perfiles añadidos y {} omitidos para no sobrescribir los existentes."
+            .format(anadidos, omitidos)
+        )
 
     def _al_deshacer_retoque(self, evento):
         if not self._historial_retoques:

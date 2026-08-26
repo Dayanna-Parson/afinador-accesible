@@ -11,10 +11,10 @@
   <h2>Pestañas</h2>
   <ul>
     <li><strong>Afinar</strong>: instrumento, cuerda, escucha y tono individual.</li>
-    <li><strong>Afinaciones especiales</strong>: familias de maqam, ajustes por cuerda y afinaciones guardadas.</li>
+    <li><strong>Afinaciones especiales</strong>: familias de maqam, ajustes por cuerda y perfiles personales.</li>
     <li><strong>Audio y ajustes</strong>: micrófono, Scarlett, WASAPI y calibración de La4.</li>
   </ul>
-  <p><kbd>Ctrl+1</kbd>, <kbd>Ctrl+2</kbd> y <kbd>Ctrl+3</kbd> abren directamente esas pestañas. Las flechas izquierda y derecha cambian de pestaña desde el cuaderno sin enviar el foco al primer control. Tab y Mayús+Tab recorren circularmente los controles de la pestaña activa.</p>
+  <p><kbd>Ctrl+1</kbd>, <kbd>Ctrl+2</kbd> y <kbd>Ctrl+3</kbd> abren directamente esas pestañas. Tab y Mayús+Tab recorren los controles utilizables; al llegar al extremo vuelven al selector de pestañas. Los controles desactivados no reciben el foco.</p>
   <h2>Afinar</h2>
   <p><kbd>Ctrl+E</kbd> inicia o detiene la escucha. <kbd>Ctrl+P</kbd> reproduce el tono objetivo de la cuerda seleccionada. <kbd>Ctrl+Mayús+P</kbd> escucha todas las cuerdas con la afinación completa actual.</p>
   <h2>Ajuste manual</h2>
@@ -22,6 +22,11 @@
   <p><kbd>Ctrl+Mayús+R</kbd> quita únicamente el retoque manual de esa cuerda. En una afinación personal basada en estándar, vuelve a fábrica; en un maqam conserva sus notas objetivo. <kbd>Ctrl+Mayús+Z</kbd> deshace el último retoque.</p>
   <h2>Maqamat y lira</h2>
   <p>La lira tiene cuerdas fijas. Cada afinación conserva los siete grados de un maqam en la tónica indicada; la primera cuerda puede ser Sol grave aunque la tónica sea Do o Re. La adaptación sirve para una afinación fija y no reproduce modulaciones ni la expresividad continua de un oud sin trastes.</p>
+  <h2>Perfiles personales y copia de seguridad</h2>
+  <p>Un perfil guarda la afinación base y tus retoques por cuerda, separado para cada instrumento. Puedes cargarlo, renombrarlo o eliminarlo; los presets incluidos nunca se modifican. Al cerrar con retoques sin guardar, la aplicación pregunta si quieres guardarlos como perfil.</p>
+  <p>“Exportar todos los perfiles” crea una copia JSON. “Importar perfiles desde copia” añade solo perfiles que no existan ya con ese nombre, para no sobrescribir tu trabajo.</p>
+  <h2>Nombres de notas y seguridad</h2>
+  <p>En Audio y ajustes puedes elegir Do–Re–Mi o C–D–E. Solo cambia la presentación y los anuncios, nunca las frecuencias. Si subes una cuerda dos semitonos o más sobre su afinación estándar, aparece un aviso de tensión antes de continuar.</p>
   <h2>Más ayuda</h2>
   <p>Consulta el README y DEVELOPMENT.md de la carpeta de la aplicación para los detalles técnicos. Pulsa <kbd>F1</kbd> en cualquier pestaña para volver a abrir esta ayuda.</p>
 </body>

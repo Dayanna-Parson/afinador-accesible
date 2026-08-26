@@ -60,9 +60,10 @@ más grande. Las tres pestañas siguen el orden de una sesión normal:
 - **Afinar**: instrumento, cuerda, detección, indicaciones y tonos de referencia.
 - **Afinaciones especiales**: afinaciones alternativas y la escucha previa.
 - **Audio y ajustes**: dispositivo, canal de la Scarlett, WASAPI, nivel de entrada,
-  calibración y opciones menos frecuentes.
+  calibración, nombres de notas y opciones menos frecuentes.
 
-Al cambiar de pestaña, el foco pasa a su primer control útil. Los botones tienen
+Tab y Mayús+Tab recorren únicamente controles utilizables; desde el primer o último
+control vuelven al selector de pestañas. Los botones tienen
 texto completo; los iconos nativos son un apoyo visual, nunca la única señal. La
 carpeta `recursos/sonidos/` está preparada para efectos opcionales que tampoco
 sustituirán los anuncios de NVDA, JAWS o Narrador.
@@ -154,13 +155,25 @@ una de estas disposiciones y luego doblar la cuerda (bending) por oído.
 Cada retoque aplicado por una escala se puede seguir ajustando a mano con
 `Ctrl+Mayús+Flecha arriba/abajo` si el oído dice otra cosa.
 
-## Afinaciones personales guardadas
+## Perfiles personales y copia de seguridad
 
 En la pestaña **Afinaciones especiales**, el bloque "Afinaciones personales"
 permite guardar la afinación actual con un nombre y recuperarla más tarde. Se
 guarda tanto el maqam o afinación base como los retoques manuales de cada cuerda.
 Por tanto, puedes crear, por ejemplo, una versión propia de Bayati y volver a
 ella sin retocar de nuevo las 16 cuerdas.
+
+Los perfiles se separan por instrumento y se pueden cargar, renombrar o eliminar.
+Los presets incluidos nunca se modifican. **Exportar todos los perfiles** guarda una
+copia JSON; **Importar perfiles desde copia** añade perfiles nuevos sin sobrescribir
+otros que ya existan con el mismo nombre.
+
+## Nombres de notas y aviso de tensión
+
+En **Audio y ajustes** se puede elegir entre Do–Re–Mi y C–D–E. Es solo una preferencia
+de presentación y anuncios: los cálculos siguen usando índices cromáticos y frecuencias.
+Al intentar subir una cuerda dos semitonos o más sobre su afinación estándar, el afinador
+solicita confirmación para evitar una subida accidental de tensión.
 
 ## Escucha previa de la escala
 
