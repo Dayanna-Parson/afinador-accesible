@@ -32,6 +32,8 @@ AJUSTES_POR_DEFECTO = {
     "familia_maqam": "Todas las familias",
     "ajustes_finos_cuerdas": {},
     "afinaciones_guardadas_lira": {},
+    "perfiles_afinacion": {},
+    "escala_base_personalizada": {},
 }
 
 

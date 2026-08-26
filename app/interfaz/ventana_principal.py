@@ -24,6 +24,7 @@ from app.motor_audio import (
 from app.conector_nvda import AnunciadorNVDA
 from app.control_microfono import asegurar_microfono_activo
 from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
+from app.perfiles_afinacion import guardar_perfil, migrar_perfiles, nombres_perfiles
 from app.config_rutas import RUTA_AYUDA
 from app.afinaciones_maqam_lira import (
     AFINACIONES_LIRA_MAQAM_24EDO,
@@ -71,6 +72,7 @@ PRESETS_INSTRUMENTO = {
 NOMBRE_LIRA = "Lira de 16 cuerdas (Aklot)"
 NOMBRE_GUITARRA = "Guitarra"
 NOMBRE_UKELELE = "Ukelele"
+NOMBRE_AFINACION_PERSONALIZADA = "Personalizada (retoques manuales)"
 
 # Guitarra y ukelele: afinaciones alternativas estándar, ampliamente documentadas. En un
 # instrumento con trastes el retoque solo desplaza la cuerda al aire entera — los trastes
@@ -138,7 +140,11 @@ class VentanaPrincipal(wx.Frame):
         self.ajustes = cargar_ajustes()
         establecer_frecuencia_la4(float(self.ajustes.get("frecuencia_la4", 440.0)))
         self.ajustes_finos_cuerdas = dict(self.ajustes.get("ajustes_finos_cuerdas", {}))
-        self.afinaciones_guardadas_lira = dict(self.ajustes.get("afinaciones_guardadas_lira", {}))
+        self.perfiles_afinacion = migrar_perfiles(self.ajustes, NOMBRE_LIRA)
+        self.escala_base_personalizada = dict(self.ajustes.get("escala_base_personalizada", {}))
+        self._perfil_cargado = None
+        self._retoques_sin_guardar = False
+        self._retoques_antes_de_editar = None
         self.retoques_escala_activa = {}
         self._historial_retoques = []
         self.anunciador = AnunciadorNVDA()
@@ -180,10 +186,12 @@ class VentanaPrincipal(wx.Frame):
         self.cuaderno.AddPage(self.pagina_audio, "Audio y ajustes")
 
         # Afinar: lo necesario para una sesión corriente.
-        etiqueta_instrumento = wx.StaticText(self.pagina_afinar, label="Instrumento:")
-        self.selector_instrumento = wx.Choice(self.pagina_afinar, choices=list(PRESETS_INSTRUMENTO.keys()))
+        self.selector_instrumento = wx.RadioBox(
+            self.pagina_afinar, label="Instrumento que quieres afinar", choices=[NOMBRE_LIRA, NOMBRE_GUITARRA, NOMBRE_UKELELE],
+            majorDimension=1, style=wx.RA_SPECIFY_ROWS,
+        )
         self.selector_instrumento.SetSelection(0)
-        self.selector_instrumento.SetHelpText("Elige uno de tus instrumentos, o el modo cromático.")
+        self.selector_instrumento.SetHelpText("Tus tres instrumentos. Al abrir cada uno parte de su afinación estándar.")
         self.selector_instrumento.Bind(wx.EVT_CHOICE, self._al_cambiar_instrumento)
         etiqueta_cuerda = wx.StaticText(self.pagina_afinar, label="Cuerda objetivo:")
         self.selector_cuerda = wx.Choice(self.pagina_afinar)
@@ -228,7 +236,7 @@ class VentanaPrincipal(wx.Frame):
         self.casilla_modo_solo_escucha.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
         self._organizar_pagina(
             self.pagina_afinar,
-            ("Instrumento y cuerda", (etiqueta_instrumento, self.selector_instrumento, etiqueta_cuerda,
+            ("Instrumento y cuerda", (self.selector_instrumento, etiqueta_cuerda,
                                         self.selector_cuerda, self.casilla_deteccion_automatica_cuerda)),
             ("Durante la afinación", (self.etiqueta_nota, self.etiqueta_instruccion, self.etiqueta_nivel,
                                          self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia)),
@@ -281,13 +289,19 @@ class VentanaPrincipal(wx.Frame):
         self.boton_restablecer_retoque = wx.Button(self.pagina_afinaciones, label="Restablecer ajuste manual de esta cuerda (Ctrl+Mayús+R)")
         aplicar_icono_boton(self.boton_restablecer_retoque, "restablecer")
         self.boton_restablecer_retoque.Bind(wx.EVT_BUTTON, self._al_restablecer_ajuste_fino)
-        etiqueta_guardadas = wx.StaticText(self.pagina_afinaciones, label="Afinaciones personales guardadas:")
+        etiqueta_guardadas = wx.StaticText(self.pagina_afinaciones, label="Perfiles personales de este instrumento:")
         self.selector_afinacion_guardada = wx.Choice(self.pagina_afinaciones)
-        self.boton_guardar_afinacion = wx.Button(self.pagina_afinaciones, label="Guardar afinación actual como...")
+        self.boton_guardar_afinacion = wx.Button(self.pagina_afinaciones, label="Guardar perfil de afinación actual como...")
         aplicar_icono_boton(self.boton_guardar_afinacion, "guardar")
+        self.boton_guardar_afinacion.SetHelpText(
+            "Guarda una copia con nombre de la afinación actual, incluida cada cuerda retocada."
+        )
         self.boton_guardar_afinacion.Bind(wx.EVT_BUTTON, self._al_guardar_afinacion_personal)
-        self.boton_cargar_afinacion = wx.Button(self.pagina_afinaciones, label="Cargar afinación guardada")
+        self.boton_cargar_afinacion = wx.Button(self.pagina_afinaciones, label="Cargar perfil seleccionado")
         aplicar_icono_boton(self.boton_cargar_afinacion, "cargar")
+        self.boton_cargar_afinacion.SetHelpText(
+            "Recupera el perfil seleccionado para el instrumento actual."
+        )
         self.boton_cargar_afinacion.Bind(wx.EVT_BUTTON, self._al_cargar_afinacion_personal)
         self._organizar_pagina(
             self.pagina_afinaciones,
@@ -298,7 +312,7 @@ class VentanaPrincipal(wx.Frame):
             ("Ajuste manual de una cuerda", (etiqueta_paso_retoque, self.selector_paso_retoque,
                                               self.boton_subir_retoque, self.boton_bajar_retoque,
                                               self.boton_restablecer_retoque)),
-            ("Afinaciones personales", (etiqueta_guardadas, self.selector_afinacion_guardada,
+            ("Perfiles personales", (etiqueta_guardadas, self.selector_afinacion_guardada,
                                          self.boton_guardar_afinacion, self.boton_cargar_afinacion)),
         )
 
@@ -530,10 +544,6 @@ class VentanaPrincipal(wx.Frame):
         )
         self.selector_verbosidad.SetSelection(1 if self.ajustes.get("instrucciones_detalladas", False) else 0)
 
-        nombre_instrumento = self.ajustes.get("instrumento")
-        if nombre_instrumento and nombre_instrumento in PRESETS_INSTRUMENTO:
-            self.selector_instrumento.SetStringSelection(nombre_instrumento)
-
         familia_maqam = self.ajustes.get("familia_maqam")
         if familia_maqam and self.selector_familia_maqam.FindString(familia_maqam) != wx.NOT_FOUND:
             self.selector_familia_maqam.SetStringSelection(familia_maqam)
@@ -546,9 +556,8 @@ class VentanaPrincipal(wx.Frame):
             if posicion_cuerda != wx.NOT_FOUND:
                 self.selector_cuerda.SetSelection(posicion_cuerda)
 
-        nombre_escala = self.ajustes.get("escala")
-        if nombre_escala and self.selector_escala.FindString(nombre_escala) != wx.NOT_FOUND:
-            self.selector_escala.SetStringSelection(nombre_escala)
+        # La sesión cotidiana siempre arranca limpia: lira, afinación de fábrica.
+        # Las demás afinaciones se recuperan conscientemente desde un perfil.
         self._aplicar_retoques_escala_activa()
 
     def _guardar_ajustes_actuales(self):
@@ -578,9 +587,13 @@ class VentanaPrincipal(wx.Frame):
             "instrucciones_detalladas": self.selector_verbosidad.GetSelection() == 1,
             "escala": self.selector_escala.GetStringSelection() or None,
             "familia_maqam": self.selector_familia_maqam.GetStringSelection() or "Todas las familias",
-            "ajustes_finos_cuerdas": self.ajustes_finos_cuerdas,
-            "afinaciones_guardadas_lira": self.afinaciones_guardadas_lira,
+            "perfiles_afinacion": self.perfiles_afinacion,
+            "escala_base_personalizada": self.escala_base_personalizada,
         })
+        # Un retoque manual es un borrador hasta que se guarde explícitamente
+        # como perfil. Así "salir sin guardar" realmente lo descarta.
+        if not self._retoques_sin_guardar:
+            self.ajustes["ajustes_finos_cuerdas"] = self.ajustes_finos_cuerdas
         guardar_ajustes(self.ajustes)
 
     def _tasa_muestreo_seleccionada(self):
@@ -623,7 +636,7 @@ class VentanaPrincipal(wx.Frame):
             self.boton_subir_retoque, self.boton_bajar_retoque,
             self.boton_restablecer_retoque,
         ):
-            control.Enable(es_lira)
+            control.Enable(instrumento != CROMATICO)
         self._actualizar_lista_afinaciones_guardadas()
         self._actualizar_opciones_escala()
 
@@ -631,6 +644,10 @@ class VentanaPrincipal(wx.Frame):
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._actualizar_contexto_afinacion()
+        if not es_lira:
+            # En instrumentos con trastes nunca se ofrece un cuarto de tono como
+            # edición manual: los trastes siguen siendo semitonos occidentales.
+            self.selector_paso_retoque.SetSelection(max(1, self.selector_paso_retoque.GetSelection()))
         if evento is not None:
             self._guardar_ajustes_actuales()
             evento.Skip()
@@ -662,6 +679,8 @@ class VentanaPrincipal(wx.Frame):
             nombres.extend(nombre for nombre in maqamat if nombre not in nombres)
         else:
             nombres = list(ESCALAS_POR_INSTRUMENTO.get(instrumento, {}))
+            if nombres:
+                nombres.insert(1, NOMBRE_AFINACION_PERSONALIZADA)
 
         self.selector_escala.Clear()
         for nombre in nombres:
@@ -677,13 +696,15 @@ class VentanaPrincipal(wx.Frame):
         seleccion = self.selector_afinacion_guardada.GetStringSelection()
         self.selector_afinacion_guardada.Clear()
         self.selector_afinacion_guardada.Append("Selecciona una afinación guardada")
-        for nombre in sorted(self.afinaciones_guardadas_lira, key=str.casefold):
+        instrumento = self.selector_instrumento.GetStringSelection()
+        for nombre in nombres_perfiles(self.perfiles_afinacion, instrumento):
             self.selector_afinacion_guardada.Append(nombre)
         posicion = self.selector_afinacion_guardada.FindString(seleccion)
         self.selector_afinacion_guardada.SetSelection(posicion if posicion != wx.NOT_FOUND else 0)
 
     def _al_cambiar_escala(self, evento):
-        self._aplicar_retoques_escala_activa()
+        self._perfil_cargado = None
+        self._aplicar_retoques_escala_activa(borrar_retoques=True)
         self._actualizar_contexto_afinacion()
         self._guardar_ajustes_actuales()
         self.anunciador.reiniciar_estado()
@@ -715,17 +736,20 @@ class VentanaPrincipal(wx.Frame):
         self.etiqueta_contexto_afinacion.SetLabel(texto)
         self.etiqueta_contexto_afinacion.Wrap(560)
 
-    def _aplicar_retoques_escala_activa(self):
+    def _aplicar_retoques_escala_activa(self, borrar_retoques=False):
         """Carga los retoques de la escala; la afinación de fábrica siempre es pura."""
         instrumento = self.selector_instrumento.GetStringSelection()
         nombre_escala = self.selector_escala.GetStringSelection()
-        if instrumento == NOMBRE_LIRA and nombre_escala == NOMBRE_AFINACION_FABRICA_LIRA:
-            prefijo = NOMBRE_LIRA + "||"
+        if borrar_retoques or (instrumento == NOMBRE_LIRA and nombre_escala == NOMBRE_AFINACION_FABRICA_LIRA):
+            prefijo = instrumento + "||"
             self.ajustes_finos_cuerdas = {
                 clave: valor for clave, valor in self.ajustes_finos_cuerdas.items()
                 if not clave.startswith(prefijo)
             }
-        desplazamientos = ESCALAS_POR_INSTRUMENTO.get(instrumento, {}).get(nombre_escala, {})
+        escala_base = nombre_escala
+        if nombre_escala == NOMBRE_AFINACION_PERSONALIZADA:
+            escala_base = self.escala_base_personalizada.get(instrumento, next(iter(ESCALAS_POR_INSTRUMENTO[instrumento]), ""))
+        desplazamientos = ESCALAS_POR_INSTRUMENTO.get(instrumento, {}).get(escala_base, {})
         self.retoques_escala_activa = {
             "{}||{}".format(instrumento, nombre_cuerda): cuartos_tono
             for nombre_cuerda, cuartos_tono in desplazamientos.items()
@@ -790,14 +814,7 @@ class VentanaPrincipal(wx.Frame):
         clave = self._clave_ajuste_fino()
         if clave is None:
             return 0
-        # Solo la lira admite retoques por cuerda. Las afinaciones alternativas
-        # de guitarra y ukelele se describen ya en la escala elegida; ningún
-        # ajuste antiguo puede convertir su afinación estándar en otra cosa.
-        retoque_manual = (
-            self.ajustes_finos_cuerdas.get(clave, 0)
-            if self.selector_instrumento.GetStringSelection() == NOMBRE_LIRA
-            else 0
-        )
+        retoque_manual = self.ajustes_finos_cuerdas.get(clave, 0)
         return self.retoques_escala_activa.get(clave, 0) + retoque_manual
 
     def _frecuencia_objetivo_actual(self):
@@ -810,24 +827,30 @@ class VentanaPrincipal(wx.Frame):
         return frecuencia_con_desplazamiento(indice_nota, octava, self._cuartos_tono_actual())
 
     def _desplazar_cuarto_tono(self, delta):
-        if self.selector_instrumento.GetStringSelection() != NOMBRE_LIRA:
-            self.anunciador.hablar("Los retoques manuales son solo para la lira.")
+        instrumento = self.selector_instrumento.GetStringSelection()
+        if instrumento == CROMATICO:
+            self.anunciador.hablar("El modo cromático no tiene cuerdas objetivo que retocar.")
+            return
+        if instrumento != NOMBRE_LIRA and abs(delta) % 2:
+            self.anunciador.hablar("En guitarra y ukelele usa semitonos o tonos; sus trastes no se adaptan a cuartos de tono.")
             return
         clave = self._clave_ajuste_fino()
         if clave is None:
             self.anunciador.hablar("No hay ninguna cuerda seleccionada para retocar.")
             return
-        if (
-            self.selector_instrumento.GetStringSelection() == NOMBRE_LIRA
-            and self.selector_escala.GetStringSelection() == NOMBRE_AFINACION_FABRICA_LIRA
-        ):
-            self.selector_escala.SetStringSelection(NOMBRE_AFINACION_PERSONALIZADA_LIRA)
+        escala_actual = self.selector_escala.GetStringSelection()
+        personalizada = NOMBRE_AFINACION_PERSONALIZADA_LIRA if instrumento == NOMBRE_LIRA else NOMBRE_AFINACION_PERSONALIZADA
+        if escala_actual != personalizada:
+            self.escala_base_personalizada[instrumento] = escala_actual
+            self.selector_escala.SetStringSelection(personalizada)
             self._aplicar_retoques_escala_activa()
         retoque_manual_previo = self.ajustes_finos_cuerdas.get(clave, 0)
+        if not self._retoques_sin_guardar:
+            self._retoques_antes_de_editar = dict(self.ajustes_finos_cuerdas)
+            self._retoques_sin_guardar = True
         self._historial_retoques.append((clave, retoque_manual_previo))
         retoque_manual = retoque_manual_previo + delta
         self.ajustes_finos_cuerdas[clave] = retoque_manual
-        self._guardar_ajustes_actuales()
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
         self._avance_ya_realizado = False
@@ -850,26 +873,29 @@ class VentanaPrincipal(wx.Frame):
         self._desplazar_cuarto_tono(-self._paso_retoque_seleccionado())
 
     def _al_restablecer_ajuste_fino(self, evento):
-        if self.selector_instrumento.GetStringSelection() != NOMBRE_LIRA:
-            self.anunciador.hablar("Los retoques manuales son solo para la lira.")
+        instrumento = self.selector_instrumento.GetStringSelection()
+        if instrumento == CROMATICO:
+            self.anunciador.hablar("El modo cromático no tiene cuerdas objetivo que restablecer.")
             return
         clave = self._clave_ajuste_fino()
         if clave is None or clave not in self.ajustes_finos_cuerdas:
             self.anunciador.hablar("Esta cuerda no tiene ningún ajuste manual que restablecer.")
             return
+        if not self._retoques_sin_guardar:
+            self._retoques_antes_de_editar = dict(self.ajustes_finos_cuerdas)
+            self._retoques_sin_guardar = True
         del self.ajustes_finos_cuerdas[clave]
-        self._guardar_ajustes_actuales()
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._historial_frecuencias.clear()
         volvimos_a_fabrica = False
         if (
-            self.selector_instrumento.GetStringSelection() == NOMBRE_LIRA
-            and self.selector_escala.GetStringSelection() == NOMBRE_AFINACION_PERSONALIZADA_LIRA
-            and not any(clave.startswith(NOMBRE_LIRA + "||") for clave in self.ajustes_finos_cuerdas)
+            self.selector_escala.GetStringSelection() == (NOMBRE_AFINACION_PERSONALIZADA_LIRA if instrumento == NOMBRE_LIRA else NOMBRE_AFINACION_PERSONALIZADA)
+            and not any(clave.startswith(instrumento + "||") for clave in self.ajustes_finos_cuerdas)
         ):
-            self.selector_escala.SetStringSelection(NOMBRE_AFINACION_FABRICA_LIRA)
+            escala_base = self.escala_base_personalizada.get(instrumento, NOMBRE_AFINACION_FABRICA_LIRA if instrumento == NOMBRE_LIRA else next(iter(ESCALAS_POR_INSTRUMENTO[instrumento])))
+            self.selector_escala.SetStringSelection(escala_base)
             self._aplicar_retoques_escala_activa()
             self._actualizar_contexto_afinacion()
             volvimos_a_fabrica = True
@@ -881,8 +907,9 @@ class VentanaPrincipal(wx.Frame):
         self.anunciador.hablar(mensaje)
 
     def _al_guardar_afinacion_personal(self, evento):
-        if self.selector_instrumento.GetStringSelection() != NOMBRE_LIRA:
-            self.anunciador.hablar("Las afinaciones personales están disponibles para la lira.")
+        instrumento = self.selector_instrumento.GetStringSelection()
+        if instrumento == CROMATICO:
+            self.anunciador.hablar("El modo cromático no tiene una afinación de cuerdas que guardar.")
             return
         dialogo = wx.TextEntryDialog(
             self, "Escribe un nombre claro para esta afinación.", "Guardar afinación personal"
@@ -896,7 +923,8 @@ class VentanaPrincipal(wx.Frame):
         if not nombre:
             self.anunciador.hablar("No se guardó la afinación porque no tiene nombre.")
             return
-        if nombre in self.afinaciones_guardadas_lira:
+        perfiles_instrumento = self.perfiles_afinacion.setdefault(instrumento, {})
+        if nombre in perfiles_instrumento:
             respuesta = wx.MessageBox(
                 "Ya existe una afinación con ese nombre. ¿Quieres reemplazarla?",
                 "Reemplazar afinación guardada",
@@ -905,33 +933,33 @@ class VentanaPrincipal(wx.Frame):
             )
             if respuesta != wx.YES:
                 return
-        prefijo = NOMBRE_LIRA + "||"
+        prefijo = instrumento + "||"
         manuales = {
             clave[len(prefijo):]: valor for clave, valor in self.ajustes_finos_cuerdas.items()
             if clave.startswith(prefijo) and valor
         }
         escala_base = self.selector_escala.GetStringSelection()
-        if escala_base == NOMBRE_AFINACION_PERSONALIZADA_LIRA:
-            escala_base = NOMBRE_AFINACION_FABRICA_LIRA
-        self.afinaciones_guardadas_lira[nombre] = {
-            "escala_base": escala_base,
-            "familia_maqam": self.selector_familia_maqam.GetStringSelection(),
-            "retoques_manuales": manuales,
-        }
+        if escala_base in (NOMBRE_AFINACION_PERSONALIZADA_LIRA, NOMBRE_AFINACION_PERSONALIZADA):
+            escala_base = self.escala_base_personalizada.get(instrumento, NOMBRE_AFINACION_FABRICA_LIRA if instrumento == NOMBRE_LIRA else next(iter(ESCALAS_POR_INSTRUMENTO[instrumento])))
+        guardar_perfil(self.perfiles_afinacion, instrumento, nombre, escala_base, manuales,
+                       self.selector_familia_maqam.GetStringSelection() if instrumento == NOMBRE_LIRA else None)
         self._actualizar_lista_afinaciones_guardadas()
         self.selector_afinacion_guardada.SetStringSelection(nombre)
+        self._retoques_sin_guardar = False
+        self._retoques_antes_de_editar = None
         self._guardar_ajustes_actuales()
         self.anunciador.hablar("Afinación guardada: {}.".format(nombre))
 
     def _al_cargar_afinacion_personal(self, evento):
         nombre = self.selector_afinacion_guardada.GetStringSelection()
-        datos = self.afinaciones_guardadas_lira.get(nombre)
+        instrumento = self.selector_instrumento.GetStringSelection()
+        datos = self.perfiles_afinacion.get(instrumento, {}).get(nombre)
         if not datos:
             self.anunciador.hablar("Selecciona primero una afinación guardada.")
             return
         escala_base = datos.get("escala_base", NOMBRE_AFINACION_FABRICA_LIRA)
         familia = datos.get("familia_maqam", "Todas las familias")
-        if escala_base in REFERENCIAS_GRADOS_MAQAM_24EDO:
+        if instrumento == NOMBRE_LIRA and escala_base in REFERENCIAS_GRADOS_MAQAM_24EDO:
             familia = next(
                 (nombre_familia for nombre_familia, maqamat in FAMILIAS_MAQAM_LIRA.items()
                  if escala_base in maqamat),
@@ -939,21 +967,24 @@ class VentanaPrincipal(wx.Frame):
             )
         if self.selector_familia_maqam.FindString(familia) == wx.NOT_FOUND:
             familia = "Todas las familias"
-        self.selector_instrumento.SetStringSelection(NOMBRE_LIRA)
-        self.selector_familia_maqam.SetStringSelection(familia)
+        if instrumento == NOMBRE_LIRA:
+            self.selector_familia_maqam.SetStringSelection(familia)
         self._actualizar_opciones_escala(preferida=escala_base)
         if self.selector_escala.FindString(escala_base) == wx.NOT_FOUND:
             escala_base = NOMBRE_AFINACION_FABRICA_LIRA
             self._actualizar_opciones_escala(preferida=escala_base)
         self.selector_escala.SetStringSelection(escala_base)
         self._aplicar_retoques_escala_activa()
-        prefijo = NOMBRE_LIRA + "||"
+        prefijo = instrumento + "||"
         self.ajustes_finos_cuerdas = {
             clave: valor for clave, valor in self.ajustes_finos_cuerdas.items()
             if not clave.startswith(prefijo)
         }
         for nombre_cuerda, valor in datos.get("retoques_manuales", {}).items():
             self.ajustes_finos_cuerdas[prefijo + nombre_cuerda] = int(valor)
+        self._perfil_cargado = nombre
+        self._retoques_sin_guardar = False
+        self._retoques_antes_de_editar = None
         self._actualizar_contexto_afinacion()
         self._guardar_ajustes_actuales()
         self.anunciador.reiniciar_estado()
@@ -968,7 +999,7 @@ class VentanaPrincipal(wx.Frame):
             self.ajustes_finos_cuerdas.pop(clave, None)
         else:
             self.ajustes_finos_cuerdas[clave] = cuartos_tono_previo
-        self._guardar_ajustes_actuales()
+        self._retoques_sin_guardar = True
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
         self._avance_ya_realizado = False
@@ -1351,6 +1382,23 @@ class VentanaPrincipal(wx.Frame):
 
     def _al_cerrar(self, evento):
         self.generador_tonos.detener_bucle()
+        if self._retoques_sin_guardar:
+            respuesta = wx.MessageBox(
+                "Has modificado una afinación sin guardarla como perfil. ¿Quieres guardarla ahora?",
+                "Guardar afinación antes de salir",
+                wx.YES_NO | wx.CANCEL | wx.ICON_QUESTION,
+                self,
+            )
+            if respuesta == wx.CANCEL:
+                return
+            if respuesta == wx.YES:
+                self._al_guardar_afinacion_personal(None)
+                if self._retoques_sin_guardar:
+                    return
+            else:
+                self.ajustes_finos_cuerdas = dict(self._retoques_antes_de_editar or {})
+                self._retoques_sin_guardar = False
+                self._retoques_antes_de_editar = None
         self._guardar_ajustes_actuales()
         self._detener_escucha()
         evento.Skip()
