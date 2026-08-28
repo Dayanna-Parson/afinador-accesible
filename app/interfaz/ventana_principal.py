@@ -598,11 +598,15 @@ class VentanaPrincipal(wx.Frame):
 
         self._al_cambiar_instrumento(None)
 
-        nombre_cuerda = self.ajustes.get("cuerda")
-        if nombre_cuerda:
-            posicion_cuerda = self.selector_cuerda.FindString(nombre_cuerda)
-            if posicion_cuerda != wx.NOT_FOUND:
-                self.selector_cuerda.SetSelection(posicion_cuerda)
+        nombre_cuerda_guardada = self.ajustes.get("cuerda")
+        if nombre_cuerda_guardada:
+            # El nombre guardado es siempre el canónico (Do Re Mi), nunca el texto
+            # visible actual: comparar por client data, no por FindString, para que
+            # restaurar la cuerda funcione igual con cualquier nomenclatura elegida.
+            for posicion in range(self.selector_cuerda.GetCount()):
+                if self.selector_cuerda.GetClientData(posicion) == nombre_cuerda_guardada:
+                    self.selector_cuerda.SetSelection(posicion)
+                    break
 
         # La sesión cotidiana siempre arranca limpia: lira, afinación de fábrica.
         # Las demás afinaciones se recuperan conscientemente desde un perfil.
@@ -618,7 +622,7 @@ class VentanaPrincipal(wx.Frame):
         self.ajustes.update({
             "nombre_dispositivo": nombre_dispositivo,
             "instrumento": self.selector_instrumento.GetStringSelection(),
-            "cuerda": self.selector_cuerda.GetStringSelection() or None,
+            "cuerda": (self._cuerda_objetivo() or (None,))[0],
             "tasa_muestreo": self._tasa_muestreo_seleccionada(),
             "canal_entrada": self._canal_entrada_seleccionado(),
             "frecuencia_la4": self.control_la4.GetValue(),
@@ -672,7 +676,34 @@ class VentanaPrincipal(wx.Frame):
         """Nombre visible y verbalizable; el cálculo musical sigue siendo numérico."""
         return "{} {}".format(self._nombres_notas_actuales()[indice_nota % 12], octava)
 
+    def _texto_visible_cuerda(self, nombre_cuerda_canonico, indice_nota):
+        """Texto de la lista de cuerdas en la nomenclatura elegida (Do Re Mi o cifrado).
+
+        El nombre canónico (p. ej. "Cuerda 3 (Si)") es siempre el mismo internamente:
+        es la clave que usan los retoques guardados, los perfiles y ajustes.json. Solo
+        se traduce lo que se muestra y se anuncia, nunca lo que se guarda ni se busca.
+        """
+        prefijo = nombre_cuerda_canonico.split(" (", 1)[0]
+        return "{} ({})".format(prefijo, self._nombres_notas_actuales()[indice_nota % 12])
+
+    def _refrescar_lista_cuerdas(self, conservar_seleccion=True):
+        preset = self._preset_actual()
+        posicion_actual = self.selector_cuerda.GetSelection() if conservar_seleccion else wx.NOT_FOUND
+        self.selector_cuerda.Clear()
+        if preset is None:
+            self.selector_cuerda.Disable()
+            return
+        for nombre_cuerda, indice_nota, octava in preset:
+            posicion = self.selector_cuerda.Append(self._texto_visible_cuerda(nombre_cuerda, indice_nota))
+            self.selector_cuerda.SetClientData(posicion, nombre_cuerda)
+        self.selector_cuerda.Enable()
+        if posicion_actual != wx.NOT_FOUND and posicion_actual < self.selector_cuerda.GetCount():
+            self.selector_cuerda.SetSelection(posicion_actual)
+        else:
+            self.selector_cuerda.SetSelection(0)
+
     def _al_cambiar_nomenclatura(self, evento):
+        self._refrescar_lista_cuerdas()
         self._guardar_ajustes_actuales()
         self._actualizar_contexto_afinacion()
         self.anunciador.hablar(
@@ -683,15 +714,7 @@ class VentanaPrincipal(wx.Frame):
         evento.Skip()
 
     def _al_cambiar_instrumento(self, evento):
-        preset = self._preset_actual()
-        self.selector_cuerda.Clear()
-        if preset is None:
-            self.selector_cuerda.Disable()
-        else:
-            for nombre_cuerda, indice_nota, octava in preset:
-                self.selector_cuerda.Append(nombre_cuerda)
-            self.selector_cuerda.SetSelection(0)
-            self.selector_cuerda.Enable()
+        self._refrescar_lista_cuerdas(conservar_seleccion=False)
 
         instrumento = self.selector_instrumento.GetStringSelection()
         es_lira = instrumento == NOMBRE_LIRA
@@ -893,10 +916,11 @@ class VentanaPrincipal(wx.Frame):
         return preset[indice]
 
     def _clave_ajuste_fino(self):
-        nombre_cuerda = self.selector_cuerda.GetStringSelection()
-        if not nombre_cuerda:
+        cuerda_objetivo = self._cuerda_objetivo()
+        if cuerda_objetivo is None:
             return None
-        return "{}||{}".format(self.selector_instrumento.GetStringSelection(), nombre_cuerda)
+        nombre_cuerda_canonico = cuerda_objetivo[0]
+        return "{}||{}".format(self.selector_instrumento.GetStringSelection(), nombre_cuerda_canonico)
 
     def _cuartos_tono_actual(self):
         clave = self._clave_ajuste_fino()
@@ -1294,8 +1318,13 @@ class VentanaPrincipal(wx.Frame):
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._historial_frecuencias.clear()
-        _, nombre_cuerda = clave.split("||", 1)
-        self.anunciador.hablar("Deshecho el último retoque de {}.".format(nombre_cuerda))
+        instrumento_clave, nombre_cuerda_canonico = clave.split("||", 1)
+        texto_cuerda = nombre_cuerda_canonico
+        for nombre_cuerda, indice_nota, octava in PRESETS_INSTRUMENTO.get(instrumento_clave) or []:
+            if nombre_cuerda == nombre_cuerda_canonico:
+                texto_cuerda = self._texto_visible_cuerda(nombre_cuerda_canonico, indice_nota)
+                break
+        self.anunciador.hablar("Deshecho el último retoque de {}.".format(texto_cuerda))
 
     # ANCLAJE_INICIO: REPETIR_INSTRUCCION_AFINACION
     def _al_repetir_instruccion(self, evento):
