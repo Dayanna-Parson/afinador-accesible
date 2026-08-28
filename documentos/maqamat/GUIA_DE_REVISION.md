@@ -1,7 +1,8 @@
 # Guía de revisión de los maqamat
 
-Este documento permite a Claude, otra desarrolladora o una persona curiosa
-revisar la parte musical sin necesitar el repositorio de Maqamusic instalado.
+Esto es para mí misma dentro de un tiempo, para quien continúe el proyecto,
+o para cualquiera con curiosidad: permite revisar la parte musical sin tener
+que instalar el repositorio de Maqamusic.
 
 ## Archivos que hay que leer primero
 

@@ -1,8 +1,10 @@
 # Auditoría de patrones de EPUB TTS v4
 
-Esta revisión compara el afinador con el código fuente local de EPUB TTS v4,
-especialmente `app/interfaz/ui_recursos.py`, `app/motor/reproductor_sonidos.py`
-y `app/interfaz/ventana_principal.py`.
+Antes de reorganizar la interfaz en pestañas, revisé qué patrones de mi otro
+proyecto, Epub TTS Accesible, tenía sentido traer aquí — sobre todo de
+`app/interfaz/ui_recursos.py`, `app/motor/reproductor_sonidos.py` y
+`app/interfaz/ventana_principal.py`. No todo lo que funciona allí encaja en
+un afinador, así que dejo también lo que decidí no traer y por qué.
 
 ## Patrones incorporados
 

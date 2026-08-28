@@ -1,7 +1,7 @@
 # Ideas para una serie en la web
 
-Estas no son artículos terminados: son una escaleta para explorar la música
-árabe desde una experiencia real, accesible y honesta.
+Esto no son artículos terminados, es mi escaleta para ir contando la música
+árabe desde mi experiencia real, de forma accesible y sin inventarme nada.
 
 1. **Cómo descubrí los maqamat escuchando música egipcia.** Una entrada personal:
    la sorpresa de oír algo “distinto” y descubrir los cuartos de tono.

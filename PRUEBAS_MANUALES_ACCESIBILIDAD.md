@@ -1,6 +1,6 @@
 # Pruebas manuales antes de una versión estable
 
-Estas comprobaciones requieren una persona usuaria y no pueden sustituirse por pruebas automáticas.
+Estas comprobaciones las hago yo, a mano, con NVDA activo y los instrumentos reales. Ningún test automático las sustituye.
 
 1. Con NVDA activo, recorre cada pestaña con Tab y Mayús+Tab. En los extremos, el foco debe llegar al selector de pestañas; nunca debe quedarse atrapado ni caer en un control desactivado.
 2. Cambia entre lira, guitarra y ukelele. Comprueba que los controles exclusivos de la lira se omiten al navegar cuando no correspondan.

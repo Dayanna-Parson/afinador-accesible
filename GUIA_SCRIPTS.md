@@ -2,28 +2,27 @@
 
 ## `INSTALAR_AFINADOR.bat`
 
-Es el punto de instalación para quien descarga el código. Crea o reutiliza un
-entorno virtual de Python, instala lo indicado en `requisitos.txt` y ofrece
-compilar el motor Rust solo si ya están disponibles sus herramientas. No hace
-falta aceptar esa opción para usar el afinador.
+Es lo primero que ejecuto tras descargar el código. Crea o reutiliza un
+entorno virtual de Python, instala lo que pide `requisitos.txt` y ofrece
+compilar el motor Rust solo si ya tengo su toolchain instalado. Esa parte es
+opcional: el afinador funciona sin ella.
 
-Ejecutarlo otra vez es seguro: actualiza las dependencias del entorno de la
-aplicación, pero no borra perfiles ni ajustes personales.
+Se puede volver a ejecutar sin miedo: actualiza las dependencias del entorno,
+pero nunca toca perfiles ni ajustes ya guardados.
 
 ## `INICIAR_AFINADOR.bat`
 
-Abre el afinador usando el entorno creado por el instalador. Si la aplicación
-se cierra por un error, la ventana permanece abierta para que se pueda leer el
-mensaje antes de pulsar una tecla.
+Abre el afinador con el entorno que creó el instalador. Si la app se cierra
+por un error, la ventana se queda abierta para poder leer el mensaje antes de
+pulsar una tecla y cerrarla de verdad.
 
 ## `iniciar_afinador.py`
 
-Es el punto de entrada para desarrollo. Se puede ejecutar desde una consola con
-`python iniciar_afinador.py` después de instalar las dependencias.
+El punto de entrada cuando estoy desarrollando: `python iniciar_afinador.py`
+desde una consola, con las dependencias ya instaladas.
 
-## Regla al modificar scripts
+## Regla al tocar estos scripts
 
-Un archivo `.bat` debe empezar situándose en su propia carpeta. No debe asumir
-desde qué ubicación lo ha abierto la persona usuaria. Los mensajes deben estar
-en español claro y dejar tiempo suficiente para leer cualquier error con un
-lector de pantalla.
+Un `.bat` tiene que situarse primero en su propia carpeta, nunca asumir desde
+dónde lo abrieron. Los mensajes van en español claro, y con tiempo suficiente
+para leerse con un lector de pantalla antes de que la ventana se cierre sola.

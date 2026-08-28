@@ -1,9 +1,9 @@
 Afinador Accesible — rama de pruebas review-claude
 
-- Interfaz organizada en Afinar, Afinaciones especiales y Audio y ajustes.
-- Navegación circular con Tab y accesos Ctrl+1, Ctrl+2 y Ctrl+3.
-- Maqamat de la lira organizados por familias, incluidas las variantes Sikah.
-- Afinación de fábrica inequívoca, sin retoques ni cuartos de tono.
-- Ajustes por cuerda en cuarto de tono, semitono o tono; botones y atajos.
-- Posibilidad de guardar y recuperar afinaciones personales de la lira.
-- Ayuda local con F1 e iconos opcionales accesibles.
+- Interfaz en tres pestañas: Afinar, Afinaciones especiales, Audio y ajustes.
+- Navegación circular con Tab y accesos directos Ctrl+1, Ctrl+2, Ctrl+3.
+- Maqamat de la lira organizados por familias, incluida la familia Sikah completa.
+- Afinación de fábrica sin ambigüedad: natural, sin retoques ni cuartos de tono.
+- Ajuste manual por cuerda en cuarto de tono, semitono o tono, con botones y atajos.
+- Perfiles de afinación guardables y recuperables por instrumento.
+- Ayuda local con F1 e iconos opcionales que nunca sustituyen al texto.

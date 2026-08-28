@@ -2,14 +2,14 @@
 
 ## Cómo leer la tabla
 
-Los grados se expresan en cents desde la tónica dentro de una octava. Por
-ejemplo, `0, 200, 350, 500, 700, 900, 1050` significa que hay grados a 0,
-200, 350… cents sobre la tónica. Un valor acabado en 50 representa un cuarto de
-tono dentro de la aproximación 24‑EDO.
+Los grados están en cents desde la tónica, dentro de una octava. Por ejemplo,
+`0, 200, 350, 500, 700, 900, 1050` significa que hay grados a 0, 200, 350...
+cents sobre la tónica. Un valor acabado en 50 es un cuarto de tono dentro de
+mi aproximación en 24-EDO.
 
-Las columnas reflejan exactamente `REFERENCIAS_GRADOS_MAQAM_24EDO` de
-`app/afinaciones_maqam_lira.py`. La tabla es documentación legible; la fuente
-ejecutable y verificable sigue siendo ese módulo.
+Esta tabla es una copia legible de `REFERENCIAS_GRADOS_MAQAM_24EDO`, en
+`app/afinaciones_maqam_lira.py`. Si alguna vez discrepan, el módulo Python
+manda: es la fuente ejecutable y la que verifican los tests.
 
 | Familia | Maqam y tónica en la app | Grados (cents) |
 |---|---|---|
@@ -39,10 +39,11 @@ ejecutable y verificable sigue siendo ese módulo.
 | Nikriz | Nikriz sobre Do | 0, 200, 300, 600, 700, 900, 1000 |
 | Nikriz | Athar Kurd sobre Do | 0, 100, 300, 600, 700, 800, 1100 |
 
-## Qué datos no muestra esta tabla
+## Qué no muestra esta tabla
 
-No incluye un “estado emocional obligatorio”, porque esas asociaciones varían
-según repertorio, región y contexto. Tampoco basta para tocar una pieza de
-maqam: faltan los ajnas concretos, notas de reposo, comportamiento melódico,
-modulaciones y ornamentación. Es un mapa de afinación, no un sustituto de la
-tradición ni de una enseñanza musical.
+No pongo un "estado emocional obligatorio" para cada maqam, porque esas
+asociaciones cambian según el repertorio, la región y quien lo interprete.
+Tampoco alcanza para tocar una pieza de maqam de verdad: faltan los ajnas
+concretos, las notas de reposo, el comportamiento melódico, la modulación y
+la ornamentación. Esto es un mapa de afinación, no un sustituto de la
+tradición ni de aprender música con quien la sabe de verdad.

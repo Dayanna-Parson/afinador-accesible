@@ -8,10 +8,10 @@ melódicos llamados **ajnas** —singular *jins*—, maneras habituales de mover
 reposar y modular. Por eso dos piezas que usan notas parecidas pueden sentirse
 radicalmente distintas.
 
-La app no pretende convertir el maqam en una lista occidental de siete notas.
-Lo que hace es una tarea concreta y honesta: preparar una afinación fija de
-lira que contenga los grados de referencia de cada maqam en una aproximación de
-24 divisiones iguales por octava (24‑EDO).
+Mi app no pretende reducir el maqam a una lista occidental de siete notas.
+Hace una tarea concreta y honesta: preparar una afinación fija de lira que
+contenga los grados de referencia de cada maqam, en una aproximación de 24
+divisiones iguales por octava (24-EDO).
 
 ## Cents, semitonos y cuartos de tono
 
@@ -40,9 +40,9 @@ No sustituye a:
 - las palancas de un qanun o de un arpa de palancas;
 - el aprendizaje auditivo y repertorial con músicas y músicos de tradición.
 
-No es una carencia del programa: es el límite físico de una lira diatónica sin
-palancas. Preparar una afinación fija sigue siendo muy útil para estudiar,
-componer, acompañar un pasaje estable o descubrir los colores de cada familia.
+No es un defecto del programa: es el límite físico de una lira diatónica sin
+palancas. Aun así, preparar una afinación fija me sirve mucho para estudiar,
+componer, acompañar un pasaje estable o descubrir el color de cada familia.
 
 ## Cómo usarlo en la aplicación
 

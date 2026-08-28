@@ -1,56 +1,58 @@
 AfinadorAccesible — léeme primero
 =================================
 
-Gracias por descargar AfinadorAccesible.
+Este es mi afinador cromático accesible para Windows, pensado desde el primer
+control para usarse con NVDA, JAWS o Narrador.
 
 Cómo empezar
 ------------
 1. Si has descargado el código fuente, ejecuta INSTALAR_AFINADOR.bat una sola
-   vez. Instala las dependencias de Python en un entorno propio de la app.
+   vez: crea un entorno propio de la app e instala sus dependencias de Python.
 2. Después ejecuta INICIAR_AFINADOR.bat para abrir el afinador.
 3. Dentro de la aplicación, pulsa F1 para abrir el manual completo.
 
-No necesitas instalar Rust para afinar. El motor Rust es opcional y el
-afinador funciona con el motor Python incluido.
+Rust es opcional. El afinador funciona igual con el motor en Python puro que
+ya incluye; solo instala Rust si quieres compilar el motor nativo de captura.
 
-Qué puedo afinar
-----------------
-- Lira Aklot de 16 cuerdas: afinación de fábrica y adaptaciones de maqam.
-- Guitarra acústica o electroclásica: estándar, Drop D, DADGAD, Open D y Open G.
+Qué puedo afinar con esto
+--------------------------
+- Lira Aklot de 16 cuerdas: afinación de fábrica y las adaptaciones de maqam.
+- Guitarra acústica o electroclásica: estándar, Drop D, DADGAD, Open D, Open G.
 - Ukelele soprano con cuerdas normales: Sol-Do-Mi-La reentrante estándar.
 
 Antes de empezar
-----------------
-- Conecta el micrófono o la Scarlett y selecciónalo en «Audio y ajustes».
-- Si tu portátil aplica cancelación de ruido por IA, desactívala: suele filtrar
-  el sonido de los instrumentos.
-- Para una Scarlett 2i2, elige entrada 1, entrada 2 o automática según dónde
+-----------------
+- Conecta el micrófono o la Scarlett y selecciónalo en "Audio y ajustes".
+- Si tu portátil tiene cancelación de ruido por IA, desactívala: suele filtrar
+  el sonido de un instrumento acústico como si fuera ruido de fondo.
+- Con una Scarlett 2i2, elige entrada 1, entrada 2 o automática según dónde
   conectes el instrumento.
 
 Accesibilidad
--------------
-La aplicación se usa por completo con teclado. Tab y Mayús+Tab recorren los
-controles disponibles; Ctrl+1, Ctrl+2 y Ctrl+3 cambian de pestaña. Los iconos
-son solo apoyo visual: toda información importante tiene texto y anuncio
-compatible con NVDA, JAWS y Narrador.
+--------------
+Todo se maneja con teclado. Tab y Mayús+Tab recorren los controles disponibles
+de la pestaña activa; Ctrl+1, Ctrl+2 y Ctrl+3 cambian de pestaña directamente.
+Los iconos son solo apoyo visual: la información importante siempre tiene
+texto y se anuncia al lector de pantalla.
 
-Ayuda y problemas
------------------
-Si algo falla, conserva el texto de error y consulta ayuda.html. Antes de
-informar de un problema de afinación, indica el instrumento, la afinación
-seleccionada, el dispositivo de entrada y si usas auriculares o Scarlett.
+Si algo falla
+---------------
+Conserva el texto del error y consulta ayuda.html. Si vas a contarme un
+problema de afinación, dime el instrumento, la afinación elegida, el
+dispositivo de entrada y si estabas con auriculares o con la Scarlett — sin
+eso no puedo reproducirlo.
 
 Estado actual
--------------
-Esta es una versión en validación. Las pruebas automáticas pasan, pero todavía
-debe probarse con instrumentos y dispositivos reales antes de declararla
-estable o moverla a main.
+--------------
+Esta rama está en pruebas. Los tests automáticos pasan, pero todavía me falta
+probarla a fondo con los tres instrumentos reales y distintos dispositivos de
+audio antes de darla por estable y pasarla a main.
 
 Tus datos
----------
+----------
 La configuración de audio y los ajustes de afinación se guardan por separado
-dentro de la carpeta "configuraciones". La aplicación crea copias de seguridad
-automáticas antes de los cambios reales y no borra el archivo antiguo al
-actualizar desde una versión anterior.
+dentro de la carpeta "configuraciones". Antes de cualquier cambio real se
+guarda una copia de seguridad, y actualizar desde una versión anterior nunca
+borra el archivo antiguo.
 
-— Dayanna Parson
+— Dayanna Parson (TifloTutos)
