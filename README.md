@@ -72,6 +72,11 @@ texto completo; los iconos nativos son un apoyo visual, nunca la única señal. 
 carpeta `recursos/sonidos/` está preparada para efectos opcionales que tampoco
 sustituirán los anuncios de NVDA, JAWS o Narrador.
 
+Desde cualquier pestaña, el menú contextual (clic derecho, tecla Menú o
+Mayús+F10) abre ayuda, la lista de atajos, tiflotutos.com y las acciones sobre
+los registros (abrir la carpeta, copiar el registro completo o solo el último
+error al portapapeles) — sin tener que ir a buscar los archivos a mano.
+
 ## Atajos de teclado
 
 - `F1`: abrir la ayuda local.

@@ -204,6 +204,18 @@ Todos declarados en una única `wx.AcceleratorTable` a nivel de `wx.Frame`
 
 Prohibido usar `Espacio` como atajo: es la tecla con la que NVDA activa controles con foco, y un atajo global en Espacio compite con eso. Si se añaden más atajos, mantenerlos todos en la misma tabla central del frame — no dupliques el mismo atajo en un panel hijo y en el frame a la vez, o la ambigüedad puede disparar el manejador equivocado.
 
+### Menú contextual (siguiendo el patrón de Epub TTS Accesible)
+`_al_menu_contextual` (bindado a `wx.EVT_CONTEXT_MENU` en el frame: clic derecho, tecla
+Menú o Mayús+F10, desde cualquier pestaña) abre un único menú — a diferencia de Epub TTS,
+que tiene un menú distinto por pestaña porque cada una opera sobre un tipo de elemento
+distinto (libro, fragmento...). El afinador no tiene esa variedad de contenido por pestaña,
+así que un solo menú global basta: ayuda, ver atajos, visitar tiflotutos.com, y las tres
+acciones sobre `registros/` (abrir la carpeta, copiar el log completo o solo el último
+error al portapapeles) — mismos nombres y comportamiento que en Epub TTS, para quien ya
+conoce esa app. "Ver atajos de teclado" muestra una lista estática (no hay un
+`gestor_atajos.py` configurable en este proyecto, los atajos son fijos en la
+`AcceleratorTable`): si se añade o cambia un atajo, hay que actualizar también esa lista.
+
 ### Modo identificación de nota
 La casilla `casilla_modo_solo_escucha` (etiqueta visible "Modo identificación de nota";
 persistida internamente como `modo_solo_escucha` en `ajustes.json` — nombre interno sin

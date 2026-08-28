@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import re
 import statistics
 import time
@@ -27,7 +28,7 @@ from app.conector_nvda import AnunciadorNVDA
 from app.control_microfono import asegurar_microfono_activo
 from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
 from app.perfiles_afinacion import guardar_perfil, migrar_perfiles, nombres_perfiles
-from app.config_rutas import RUTA_AYUDA
+from app.config_rutas import RUTA_AYUDA, RUTA_ERRORES, RUTA_REGISTROS
 from app.afinaciones_maqam_lira import (
     FAMILIAS_MAQAM_LIRA,
     NOMBRE_AFINACION_FABRICA_LIRA,
@@ -134,6 +135,7 @@ class VentanaPrincipal(wx.Frame):
         self._aplicar_ajustes_guardados()
 
         self.Bind(wx.EVT_CLOSE, self._al_cerrar)
+        self.Bind(wx.EVT_CONTEXT_MENU, self._al_menu_contextual)
         self.Centre()
         self.Show()
 
@@ -1799,6 +1801,109 @@ class VentanaPrincipal(wx.Frame):
     def _al_cambiar_ajuste_simple(self, evento):
         self._guardar_ajustes_actuales()
         evento.Skip()
+
+    def _al_menu_contextual(self, evento):
+        """Menú contextual único: no hay distintos tipos de elemento por pestaña
+        como en Epub TTS, así que aquí basta un solo menú accesible desde cualquiera."""
+        menu = wx.Menu()
+
+        item_ayuda = menu.Append(wx.ID_ANY, "Abrir ayuda (F1)")
+        self.Bind(wx.EVT_MENU, lambda evento: self._abrir_ayuda(), item_ayuda)
+
+        item_atajos = menu.Append(wx.ID_ANY, "Ver atajos de teclado")
+        self.Bind(wx.EVT_MENU, self._al_ver_atajos, item_atajos)
+
+        menu.AppendSeparator()
+
+        item_tiflotutos = menu.Append(wx.ID_ANY, "Visitar tiflotutos.com")
+        self.Bind(wx.EVT_MENU, self._al_visitar_tiflotutos, item_tiflotutos)
+
+        menu.AppendSeparator()
+
+        item_registros = menu.Append(wx.ID_ANY, "Abrir carpeta de registros")
+        self.Bind(wx.EVT_MENU, self._al_abrir_carpeta_registros, item_registros)
+
+        item_copiar_registros = menu.Append(wx.ID_ANY, "Copiar registros al portapapeles")
+        self.Bind(wx.EVT_MENU, self._al_copiar_registros, item_copiar_registros)
+
+        item_copiar_error = menu.Append(wx.ID_ANY, "Copiar el último error al portapapeles")
+        self.Bind(wx.EVT_MENU, self._al_copiar_ultimo_error, item_copiar_error)
+
+        menu.AppendSeparator()
+
+        item_salir = menu.Append(wx.ID_EXIT, "Salir")
+        self.Bind(wx.EVT_MENU, lambda evento: self.Close(), item_salir)
+
+        self.PopupMenu(menu)
+        menu.Destroy()
+
+    def _al_ver_atajos(self, evento):
+        lineas = [
+            "F1: abrir la ayuda local.",
+            "Ctrl+1, Ctrl+2, Ctrl+3: abrir Afinar, Afinaciones especiales o Audio y ajustes.",
+            "Ctrl+P: reproducir el tono de referencia de la cuerda/nota seleccionada.",
+            "Ctrl+E: iniciar o detener la escucha del micrófono.",
+            "Ctrl+Mayús+Flecha arriba / Ctrl+Mayús+Flecha abajo: subir o bajar la cuerda "
+            "seleccionada según el tamaño elegido en \"Ajuste manual de una cuerda\".",
+            "Ctrl+Mayús+R: restablecer únicamente el ajuste manual de la cuerda seleccionada.",
+            "Ctrl+Mayús+Z: deshacer el último retoque en cuartos de tono.",
+            "Ctrl+Mayús+P: reproducir la afinación completa, todas las cuerdas seguidas.",
+            "Ctrl+Mayús+V: repetir la última instrucción de afinación anunciada.",
+        ]
+        wx.MessageBox("\n".join(lineas), "Atajos de teclado actuales", wx.OK | wx.ICON_INFORMATION)
+
+    def _al_visitar_tiflotutos(self, evento):
+        webbrowser.open("https://tiflotutos.com")
+
+    def _al_abrir_carpeta_registros(self, evento):
+        os.makedirs(RUTA_REGISTROS, exist_ok=True)
+        try:
+            os.startfile(RUTA_REGISTROS)
+        except Exception:
+            logger.exception("no se pudo abrir la carpeta de registros")
+            self.anunciador.hablar("No se pudo abrir la carpeta de registros.")
+
+    def _al_copiar_registros(self, evento):
+        ruta_log = os.path.join(RUTA_REGISTROS, "afinador.log")
+        try:
+            with open(ruta_log, "r", encoding="utf-8") as archivo:
+                contenido = archivo.read()
+        except Exception as error:
+            wx.MessageBox("No se pudo leer el registro:\n{}".format(error), "Error", wx.OK | wx.ICON_ERROR)
+            return
+        if wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(wx.TextDataObject(contenido))
+            wx.TheClipboard.Close()
+            self.anunciador.hablar("Registros copiados al portapapeles.")
+        else:
+            wx.MessageBox("No se pudo abrir el portapapeles.", "Error", wx.OK | wx.ICON_ERROR)
+
+    def _al_copiar_ultimo_error(self, evento):
+        try:
+            archivos = [os.path.join(RUTA_ERRORES, nombre) for nombre in os.listdir(RUTA_ERRORES)]
+        except Exception as error:
+            wx.MessageBox(
+                "No se pudo leer la carpeta de errores:\n{}".format(error), "Error", wx.OK | wx.ICON_ERROR
+            )
+            return
+        if not archivos:
+            wx.MessageBox("No hay ningún error registrado todavía.", "Sin errores", wx.OK | wx.ICON_INFORMATION)
+            return
+        ultimo = max(archivos, key=os.path.getmtime)
+        try:
+            with open(ultimo, "r", encoding="utf-8") as archivo:
+                contenido = archivo.read()
+        except Exception as error:
+            wx.MessageBox("No se pudo leer el error:\n{}".format(error), "Error", wx.OK | wx.ICON_ERROR)
+            return
+        if wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(wx.TextDataObject(contenido))
+            wx.TheClipboard.Close()
+            self.anunciador.hablar(
+                "Último error ({}) copiado al portapapeles.".format(os.path.basename(ultimo))
+            )
+        else:
+            wx.MessageBox("No se pudo abrir el portapapeles.", "Error", wx.OK | wx.ICON_ERROR)
 
     def _al_cerrar(self, evento):
         self.generador_tonos.detener_bucle()
