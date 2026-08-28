@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import statistics
 import time
 import webbrowser
@@ -638,7 +639,7 @@ class VentanaPrincipal(wx.Frame):
             "deteccion_automatica_cuerda": self.casilla_deteccion_automatica_cuerda.GetValue(),
             "instrucciones_detalladas": self.selector_verbosidad.GetSelection() == 1,
             "nomenclatura_notas": "americano" if self.selector_nomenclatura.GetSelection() == 1 else "solfeo",
-            "escala": self.selector_escala.GetStringSelection() or None,
+            "escala": self._canonico_seleccionado(self.selector_escala),
             "familia_maqam": self.selector_familia_maqam.GetStringSelection() or "Todas las familias",
             "perfiles_afinacion": self.perfiles_afinacion,
             "escala_base_personalizada": self.escala_base_personalizada,
@@ -686,6 +687,52 @@ class VentanaPrincipal(wx.Frame):
         prefijo = nombre_cuerda_canonico.split(" (", 1)[0]
         return "{} ({})".format(prefijo, self._nombres_notas_actuales()[indice_nota % 12])
 
+    _TRADUCCION_NOTA_AMERICANA = {"Do": "C", "Re": "D", "Mi": "E", "Fa": "F", "Sol": "G", "La": "A", "Si": "B"}
+    _TRADUCCION_ALTERACION_AMERICANA = {
+        "medio bemol": "half-flat", "medio sostenido": "half-sharp",
+        "bemol": "flat", "sostenido": "sharp",
+    }
+    _PATRON_NOTA_SOLFEO = re.compile(
+        r"\b(Do|Re|Mi|Fa|Sol|La|Si)( medio bemol| medio sostenido| bemol| sostenido)?\b"
+    )
+
+    def _traducir_notas_texto(self, texto):
+        """Traduce nombres de notas en solfeo dentro de cualquier texto de interfaz.
+
+        Usado para los nombres de escalas/maqamat y para la tónica anunciada en
+        _actualizar_contexto_afinacion: son textos fijos escritos en solfeo (la fuente
+        original, y la clave interna de ESCALAS_POR_INSTRUMENTO/perfiles) que solo se
+        traducen para mostrarlos o anunciarlos, nunca para guardarlos ni compararlos.
+        """
+        if self.selector_nomenclatura.GetSelection() != 1:
+            return texto
+
+        def reemplazar(coincidencia):
+            base = self._TRADUCCION_NOTA_AMERICANA[coincidencia.group(1)]
+            sufijo = coincidencia.group(2)
+            if not sufijo:
+                return base
+            return "{} {}".format(base, self._TRADUCCION_ALTERACION_AMERICANA[sufijo.strip()])
+
+        return self._PATRON_NOTA_SOLFEO.sub(reemplazar, texto).replace(" mayor", " major")
+
+    def _texto_visible_escala(self, nombre_escala_canonico):
+        return self._traducir_notas_texto(nombre_escala_canonico)
+
+    def _canonico_seleccionado(self, control):
+        """Valor real (sin traducir) tras el texto visible actual de un wx.Choice."""
+        posicion = control.GetSelection()
+        if posicion == wx.NOT_FOUND:
+            return None
+        return control.GetClientData(posicion)
+
+    def _posicion_por_client_data(self, control, valor_canonico):
+        if valor_canonico is not None:
+            for posicion in range(control.GetCount()):
+                if control.GetClientData(posicion) == valor_canonico:
+                    return posicion
+        return wx.NOT_FOUND
+
     def _refrescar_lista_cuerdas(self, conservar_seleccion=True):
         preset = self._preset_actual()
         posicion_actual = self.selector_cuerda.GetSelection() if conservar_seleccion else wx.NOT_FOUND
@@ -704,6 +751,7 @@ class VentanaPrincipal(wx.Frame):
 
     def _al_cambiar_nomenclatura(self, evento):
         self._refrescar_lista_cuerdas()
+        self._actualizar_opciones_escala()
         self._guardar_ajustes_actuales()
         self._actualizar_contexto_afinacion()
         self.anunciador.hablar(
@@ -764,8 +812,8 @@ class VentanaPrincipal(wx.Frame):
         instrumento = self.selector_instrumento.GetStringSelection()
         seleccion_anterior = (
             preferida
-            or self.selector_escala_rapida.GetStringSelection()
-            or self.selector_escala.GetStringSelection()
+            or self._canonico_seleccionado(self.selector_escala_rapida)
+            or self._canonico_seleccionado(self.selector_escala)
         )
         if instrumento == NOMBRE_LIRA:
             familia = self.selector_familia_maqam.GetStringSelection()
@@ -784,9 +832,10 @@ class VentanaPrincipal(wx.Frame):
         for selector in (self.selector_escala_rapida, self.selector_escala):
             selector.Clear()
             for nombre in nombres:
-                selector.Append(nombre)
+                posicion = selector.Append(self._texto_visible_escala(nombre))
+                selector.SetClientData(posicion, nombre)
             if nombres:
-                posicion = selector.FindString(seleccion_anterior)
+                posicion = self._posicion_por_client_data(selector, seleccion_anterior)
                 selector.SetSelection(posicion if posicion != wx.NOT_FOUND else 0)
                 selector.Enable()
             else:
@@ -804,10 +853,10 @@ class VentanaPrincipal(wx.Frame):
         self.selector_afinacion_guardada.SetSelection(posicion if posicion != wx.NOT_FOUND else 0)
 
     def _al_cambiar_escala(self, evento):
-        self._cambiar_escala(evento.GetEventObject().GetStringSelection(), evento)
+        self._cambiar_escala(self._canonico_seleccionado(evento.GetEventObject()), evento)
 
     def _al_cambiar_escala_rapida(self, evento):
-        self._cambiar_escala(evento.GetEventObject().GetStringSelection(), evento)
+        self._cambiar_escala(self._canonico_seleccionado(evento.GetEventObject()), evento)
 
     def _cambiar_escala(self, nombre_escala, evento=None):
         """Aplica una escala desde cualquiera de los dos selectores sincronizados."""
@@ -822,18 +871,25 @@ class VentanaPrincipal(wx.Frame):
         self._afinada_desde = None
         self._avance_ya_realizado = False
         self._historial_frecuencias.clear()
-        self.anunciador.hablar("Afinación aplicada: {}.".format(nombre_escala))
+        self.anunciador.hablar("Afinación aplicada: {}.".format(self._texto_visible_escala(nombre_escala)))
         if evento is not None:
             evento.Skip()
 
     def _actualizar_contexto_afinacion(self):
-        """Explica la tónica real sin confundirla con la cuerda más grave de la lira."""
+        """Explica la tónica real sin confundirla con la cuerda más grave de la lira.
+
+        Solo se traducen los nombres de nota aislados (la tónica, "Do mayor"), nunca la
+        frase completa: el texto fijo incluye palabras españolas normales como "La" o "Si"
+        que una traducción ingenua confundiría con las notas La/Si.
+        """
         if self.selector_instrumento.GetStringSelection() != NOMBRE_LIRA:
             self.etiqueta_contexto_afinacion.SetLabel("")
             return
-        nombre = self.selector_escala.GetStringSelection()
+        nombre = self._canonico_seleccionado(self.selector_escala)
         if nombre == NOMBRE_AFINACION_FABRICA_LIRA:
-            texto = "Afinación de fábrica: notas de Do mayor. La cuerda más grave es Sol, pero no hay una tónica obligatoria hasta que toques una melodía o escala."
+            texto = "Afinación de fábrica: notas de {}. La cuerda más grave es Sol, pero no hay una tónica obligatoria hasta que toques una melodía o escala.".format(
+                self._traducir_notas_texto("Do mayor")
+            )
         elif nombre == NOMBRE_AFINACION_PERSONALIZADA_LIRA:
             texto = "Afinación personalizada: conserva tus retoques manuales. Comprueba cada nota objetivo antes de tocar."
         elif nombre in REFERENCIAS_GRADOS_MAQAM_24EDO:
@@ -841,7 +897,7 @@ class VentanaPrincipal(wx.Frame):
             texto = (
                 "Tónica del maqam: {}. La escucha empieza por Sol grave porque es la primera cuerda física de la lira; "
                 "no significa que Sol sea la tónica. Esta adaptación conserva los siete grados en una afinación fija de lira."
-            ).format(tonica)
+            ).format(self._traducir_notas_texto(tonica))
         else:
             texto = "Afinación seleccionada."
         self.etiqueta_contexto_afinacion.SetLabel(texto)
@@ -850,7 +906,7 @@ class VentanaPrincipal(wx.Frame):
     def _aplicar_retoques_escala_activa(self, borrar_retoques=False):
         """Carga los retoques de la escala; la afinación de fábrica siempre es pura."""
         instrumento = self.selector_instrumento.GetStringSelection()
-        nombre_escala = self.selector_escala.GetStringSelection()
+        nombre_escala = self._canonico_seleccionado(self.selector_escala)
         if borrar_retoques or (instrumento == NOMBRE_LIRA and nombre_escala == NOMBRE_AFINACION_FABRICA_LIRA):
             prefijo = instrumento + "||"
             self.ajustes_finos_cuerdas = {
@@ -967,7 +1023,7 @@ class VentanaPrincipal(wx.Frame):
             if respuesta != wx.YES:
                 self.anunciador.hablar("Ajuste cancelado para proteger la cuerda.")
                 return
-        escala_actual = self.selector_escala.GetStringSelection()
+        escala_actual = self._canonico_seleccionado(self.selector_escala)
         personalizada = NOMBRE_AFINACION_PERSONALIZADA_LIRA if instrumento == NOMBRE_LIRA else NOMBRE_AFINACION_PERSONALIZADA
         if escala_actual != personalizada:
             self.escala_base_personalizada[instrumento] = escala_actual
@@ -1019,7 +1075,7 @@ class VentanaPrincipal(wx.Frame):
         self._historial_frecuencias.clear()
         volvimos_a_fabrica = False
         if (
-            self.selector_escala.GetStringSelection() == (NOMBRE_AFINACION_PERSONALIZADA_LIRA if instrumento == NOMBRE_LIRA else NOMBRE_AFINACION_PERSONALIZADA)
+            self._canonico_seleccionado(self.selector_escala) == (NOMBRE_AFINACION_PERSONALIZADA_LIRA if instrumento == NOMBRE_LIRA else NOMBRE_AFINACION_PERSONALIZADA)
             and not any(clave.startswith(instrumento + "||") for clave in self.ajustes_finos_cuerdas)
         ):
             escala_base = self.escala_base_personalizada.get(instrumento, NOMBRE_AFINACION_FABRICA_LIRA if instrumento == NOMBRE_LIRA else next(iter(ESCALAS_POR_INSTRUMENTO[instrumento])))
@@ -1132,7 +1188,7 @@ class VentanaPrincipal(wx.Frame):
             clave[len(prefijo):]: valor for clave, valor in self.ajustes_finos_cuerdas.items()
             if clave.startswith(prefijo) and valor
         }
-        escala_base = self.selector_escala.GetStringSelection()
+        escala_base = self._canonico_seleccionado(self.selector_escala)
         if escala_base in (NOMBRE_AFINACION_PERSONALIZADA_LIRA, NOMBRE_AFINACION_PERSONALIZADA):
             escala_base = self.escala_base_personalizada.get(instrumento, NOMBRE_AFINACION_FABRICA_LIRA if instrumento == NOMBRE_LIRA else next(iter(ESCALAS_POR_INSTRUMENTO[instrumento])))
         guardar_perfil(self.perfiles_afinacion, instrumento, nombre, escala_base, manuales,
@@ -1167,7 +1223,7 @@ class VentanaPrincipal(wx.Frame):
         if instrumento == NOMBRE_LIRA:
             self.selector_familia_maqam.SetStringSelection(familia)
         self._actualizar_opciones_escala(preferida=escala_base)
-        if self.selector_escala.FindString(escala_base) == wx.NOT_FOUND:
+        if self._posicion_por_client_data(self.selector_escala, escala_base) == wx.NOT_FOUND:
             escala_base = (
                 NOMBRE_AFINACION_FABRICA_LIRA if instrumento == NOMBRE_LIRA
                 else next(iter(ESCALAS_POR_INSTRUMENTO[instrumento]), "")
@@ -1351,7 +1407,7 @@ class VentanaPrincipal(wx.Frame):
                 frecuencias.append(frecuencia)
             logger.info(
                 "escucha previa solicitada: instrumento=%s escala=%s cuerdas=%s frecuencias=%s",
-                instrumento, self.selector_escala.GetStringSelection(), len(preset), frecuencias,
+                instrumento, self._canonico_seleccionado(self.selector_escala), len(preset), frecuencias,
             )
             self.anunciador.hablar(
                 "Escucha previa de la afinación objetivo: {} cuerdas, desde la más grave a la más aguda."
