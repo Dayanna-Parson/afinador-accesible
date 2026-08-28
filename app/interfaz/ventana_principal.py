@@ -1398,21 +1398,38 @@ class VentanaPrincipal(wx.Frame):
                 self.anunciador.hablar("No hay ninguna afinación que previsualizar en modo Cromático.")
                 return
             frecuencias = []
+            cuerdas_con_retoque = 0
             for nombre_cuerda, indice_nota, octava in preset:
                 clave = "{}||{}".format(instrumento, nombre_cuerda)
                 cuartos_tono = self.retoques_escala_activa.get(clave, 0) + self.ajustes_finos_cuerdas.get(clave, 0)
                 frecuencia = frecuencia_con_desplazamiento(indice_nota, octava, cuartos_tono)
                 if not isinstance(frecuencia, (float, int)) or frecuencia <= 0:
                     raise ValueError("frecuencia no válida para {}: {!r}".format(nombre_cuerda, frecuencia))
+                if cuartos_tono:
+                    # Comparación A/B: primero la nota de fábrica, luego la retocada, seguidas.
+                    # Un cuarto de tono (50 cents) es una diferencia real pero difícil de
+                    # distinguir en una nota aislada; el contraste directo la hace audible sin
+                    # depender de recordar cómo sonaba la cuerda anterior.
+                    cuerdas_con_retoque += 1
+                    frecuencia_fabrica = frecuencia_con_desplazamiento(indice_nota, octava, 0)
+                    frecuencias.append(frecuencia_fabrica)
                 frecuencias.append(frecuencia)
             logger.info(
-                "reproducción de afinación completa solicitada: instrumento=%s escala=%s cuerdas=%s frecuencias=%s",
-                instrumento, self._canonico_seleccionado(self.selector_escala), len(preset), frecuencias,
+                "reproducción de afinación completa solicitada: instrumento=%s escala=%s cuerdas=%s "
+                "cuerdas_con_retoque=%s frecuencias=%s",
+                instrumento, self._canonico_seleccionado(self.selector_escala), len(preset),
+                cuerdas_con_retoque, frecuencias,
             )
-            self.anunciador.hablar(
-                "Reproduciendo la afinación completa: {} cuerdas, desde la más grave a la más aguda."
-                .format(len(preset))
-            )
+            if cuerdas_con_retoque:
+                self.anunciador.hablar(
+                    "Reproduciendo la afinación completa: {} cuerdas, {} con retoque (fábrica y luego "
+                    "retocada). Desde la más grave a la más aguda.".format(len(preset), cuerdas_con_retoque)
+                )
+            else:
+                self.anunciador.hablar(
+                    "Reproduciendo la afinación completa: {} cuerdas, desde la más grave a la más aguda."
+                    .format(len(preset))
+                )
             self.generador_tonos.reproducir_secuencia(
                 frecuencias,
                 al_finalizar=lambda: wx.CallAfter(self.anunciador.hablar, "Reproducción terminada.")

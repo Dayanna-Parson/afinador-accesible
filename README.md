@@ -191,9 +191,10 @@ escalas y maqams solo modifican unas pocas cuerdas respecto a la afinación de f
 forma más clara de notar cuáles cambian y cuáles no. Se puede interrumpir a mitad volviendo
 a pulsar `Ctrl+Mayús+P`, o deteniendo la escucha del micrófono con `Ctrl+E` si estaba activa.
 
-Reproduce una vez las notas objetivo completas, desde la cuerda más grave hasta la más
-aguda. Así permite comprobar cómo debe quedar el instrumento sin mezclar la afinación de
-fábrica con otra nota de comparación. Es una reproducción por los altavoces: no requiere
+En las cuerdas que llevan retoque, reproduce primero la nota de fábrica y justo después la
+retocada (comparación A/B), porque un cuarto de tono es una diferencia sutil que se nota
+mucho mejor por contraste directo que recordando cómo sonaba la cuerda anterior; las
+cuerdas sin retoque suenan una sola vez. Es una reproducción por los altavoces: no requiere
 tener la escucha del micrófono encendida ni la sustituye.
 
 ## Modo identificación de nota

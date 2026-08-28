@@ -227,10 +227,11 @@ para no saltar de cuerda con ruido o armónicos ambiguos entre cuerdas adyacente
 `_al_escucha_previa_escala` (botón "Reproducir la afinación completa", `Ctrl+Mayús+P`) reproduce
 una sola vez cada cuerda de la afinación activa, en su frecuencia objetivo final (de fábrica
 más el retoque de escala/manual ya aplicado), de la más grave a la más aguda, vía
-`reproducir_secuencia()`. **No** hace una comparación A/B fábrica-vs-retocada por cuerda —
-si se quiere ese contraste explícito para notar un cuarto de tono sutil, hay que añadirlo
-aparte (pendiente de decidir con la usuaria); tal y como está ahora, cada cuerda suena una
-sola vez con su nota objetivo.
+`reproducir_secuencia()`. En las cuerdas que llevan retoque (`cuartos_tono` distinto de cero
+en `retoques_escala_activa` + `ajustes_finos_cuerdas`), reproduce primero la nota de fábrica y
+justo después la retocada (comparación A/B) — un cuarto de tono es una diferencia real pero
+difícil de distinguir en una nota aislada, y el contraste directo la hace audible sin depender
+de recordar cómo sonaba la cuerda anterior. Las cuerdas sin retoque suenan una sola vez.
 
 ### Nivel de detalle de las instrucciones
 `selector_verbosidad` (persistido como `instrucciones_detalladas`) tiene dos modos: conciso
