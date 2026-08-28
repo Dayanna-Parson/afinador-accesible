@@ -1,6 +1,6 @@
 __pycache__/
 *.pyc
-afinador.log
+registros/
 motor_rust/target/
 *.so
 *.pyd
