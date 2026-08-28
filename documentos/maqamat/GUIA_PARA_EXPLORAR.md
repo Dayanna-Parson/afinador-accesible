@@ -62,8 +62,8 @@ componer, acompañar un pasaje estable o descubrir los colores de cada familia.
 Que la primera cuerda sea Sol no hace que todas las afinaciones estén “en Sol”.
 La lira empieza físicamente por Sol3, pero la tónica del maqam se indica en su
 nombre: Bayati sobre Re reposa en Re; Sikah sobre Mi medio bemol reposa en esa
-nota intermedia. La escucha previa siempre sigue el orden físico de las
-cuerdas, no una escala ascendente desde la tónica.
+nota intermedia. La reproducción de la afinación completa siempre sigue el orden físico de
+las cuerdas, no una escala ascendente desde la tónica.
 
 ## Para escuchar y aprender
 

@@ -177,7 +177,7 @@ class VentanaPrincipal(wx.Frame):
             "Para la lira incluye la afinación de fábrica y los maqamat."
         )
         self.selector_escala_rapida.Bind(wx.EVT_CHOICE, self._al_cambiar_escala_rapida)
-        self.boton_abrir_perfiles = wx.Button(self.pagina_afinar, label="Perfiles personales...")
+        self.boton_abrir_perfiles = wx.Button(self.pagina_afinar, label="Cargar o guardar perfil personal...")
         aplicar_icono_boton(self.boton_abrir_perfiles, "guardar")
         self.boton_abrir_perfiles.SetHelpText(
             "Abre una ventana para cargar o guardar las afinaciones personales del instrumento elegido."
@@ -229,7 +229,7 @@ class VentanaPrincipal(wx.Frame):
         self.casilla_pitido_confirmacion.SetValue(True)
         self.casilla_pitido_confirmacion.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
         self.casilla_modo_solo_escucha = wx.CheckBox(
-            self.pagina_afinar, label="Modo solo escucha (dice la nota detectada, sin instrucciones de sube/baja)"
+            self.pagina_afinar, label="Modo identificación de nota (dice qué nota detecta, sin instrucciones de sube o baja)"
         )
         self.casilla_modo_solo_escucha.SetValue(False)
         self.casilla_modo_solo_escucha.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
@@ -261,7 +261,7 @@ class VentanaPrincipal(wx.Frame):
         self.selector_escala.SetHelpText("Las opciones dependen del instrumento elegido en la pestaña Afinar.")
         self.selector_escala.Bind(wx.EVT_CHOICE, self._al_cambiar_escala)
         self.boton_escucha_previa = wx.Button(
-            self.pagina_afinaciones, label="Escuchar la afinación completa actual (Ctrl+Mayús+P)"
+            self.pagina_afinaciones, label="Reproducir la afinación completa (Ctrl+Mayús+P)"
         )
         aplicar_icono_boton(self.boton_escucha_previa, "reproducir")
         self.boton_escucha_previa.SetHelpText(
@@ -517,11 +517,11 @@ class VentanaPrincipal(wx.Frame):
             self.anunciador.hablar("No se pudo abrir la ayuda local.")
 
     def _construir_atajos(self):
-        """Ctrl+P reproduce el tono de referencia, Ctrl+E alterna la escucha, Ctrl+Mayús+Flecha
-        arriba/abajo retoca la cuerda seleccionada en cuartos de tono, Ctrl+Mayús+R restablece
-        ese retoque, Ctrl+Mayús+Z deshace el último retoque, y Ctrl+Mayús+P reproduce una
-        escucha previa de toda la escala/afinación activa, y Ctrl+Mayús+V repite la última
-        instrucción de afinación. Nunca se usa la tecla Espacio."""
+        """Ctrl+P reproduce el tono de referencia, Ctrl+E enciende o apaga la escucha del
+        micrófono, Ctrl+Mayús+Flecha arriba/abajo retoca la cuerda seleccionada en cuartos de
+        tono, Ctrl+Mayús+R restablece ese retoque, Ctrl+Mayús+Z deshace el último retoque, y
+        Ctrl+Mayús+P reproduce la afinación completa activa (todas las cuerdas seguidas), y
+        Ctrl+Mayús+V repite la última instrucción de afinación. Nunca se usa la tecla Espacio."""
         self.Bind(wx.EVT_MENU, self._al_reproducir_referencia, id=ID_ATAJO_REPRODUCIR_REFERENCIA)
         self.Bind(wx.EVT_MENU, self._al_alternar_escucha, id=ID_ATAJO_ALTERNAR_ESCUCHA)
         self.Bind(wx.EVT_MENU, self._al_subir_cuarto_tono, id=ID_ATAJO_SUBIR_CUARTO_TONO)
@@ -1406,21 +1406,22 @@ class VentanaPrincipal(wx.Frame):
                     raise ValueError("frecuencia no válida para {}: {!r}".format(nombre_cuerda, frecuencia))
                 frecuencias.append(frecuencia)
             logger.info(
-                "escucha previa solicitada: instrumento=%s escala=%s cuerdas=%s frecuencias=%s",
+                "reproducción de afinación completa solicitada: instrumento=%s escala=%s cuerdas=%s frecuencias=%s",
                 instrumento, self._canonico_seleccionado(self.selector_escala), len(preset), frecuencias,
             )
             self.anunciador.hablar(
-                "Escucha previa de la afinación objetivo: {} cuerdas, desde la más grave a la más aguda."
+                "Reproduciendo la afinación completa: {} cuerdas, desde la más grave a la más aguda."
                 .format(len(preset))
             )
             self.generador_tonos.reproducir_secuencia(
                 frecuencias,
-                al_finalizar=lambda: wx.CallAfter(self.anunciador.hablar, "Escucha previa terminada.")
+                al_finalizar=lambda: wx.CallAfter(self.anunciador.hablar, "Reproducción terminada.")
             )
         except Exception:
-            logger.exception("fallo al preparar la escucha previa de la afinación")
+            logger.exception("fallo al preparar la reproducción de la afinación completa")
             self.anunciador.hablar(
-                "No se pudo iniciar la escucha previa. El detalle se ha guardado en registros, errores."
+                "No se pudo iniciar la reproducción de la afinación completa. "
+                "El detalle se ha guardado en registros, errores."
             )
 
     def _al_cambiar_dispositivo(self, evento):
@@ -1700,8 +1701,8 @@ class VentanaPrincipal(wx.Frame):
         if self.casilla_modo_solo_escucha.GetValue():
             # Solo dice la nota que suena, sin instrucciones de sube/baja ni confirmación de
             # afinada: para quien solo quiere identificar por oído lo que está tocando.
-            self.etiqueta_instruccion.SetLabel("Instrucción: — (modo solo escucha)")
-            self._actualizar_indicador_visual(cents, "nota detectada; modo solo escucha")
+            self.etiqueta_instruccion.SetLabel("Instrucción: — (modo identificación de nota)")
+            self._actualizar_indicador_visual(cents, "nota detectada; modo identificación de nota")
             self._ultima_instruccion_afinacion = None
             self.anunciador.procesar_instruccion(
                 self._formatear_nota(resultado["indice_nota"], resultado["octava"])

@@ -553,13 +553,13 @@ class GeneradorTonos:
                 if self._detener_bucle.wait(timeout=pausa):
                     break
         except Exception:
-            logger.exception("fallo al reproducir la escucha previa de la escala")
+            logger.exception("fallo al reproducir la afinación completa")
         finally:
             sd.stop()
             self._finalizar_reproduccion(identificador, al_finalizar)
 
     def reproducir_secuencia(self, frecuencias, duracion=0.6, pausa=0.15, amplitud=0.45, al_finalizar=None):
-        """Reproduce una lista de frecuencias en orden, una sola vez (escucha previa de escala).
+        """Reproduce una lista de frecuencias en orden, una sola vez (reproducir la afinación completa).
 
         Se puede interrumpir a mitad con detener_bucle(), igual que reproducir_en_bucle().
         """

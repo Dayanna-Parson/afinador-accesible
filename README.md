@@ -62,7 +62,7 @@ La ventana tiene un tamaño inicial cómodo sin maximizar y se adapta si se hace
 más grande. Las tres pestañas siguen el orden de una sesión normal:
 
 - **Afinar**: instrumento, cuerda, detección, indicaciones y tonos de referencia.
-- **Afinaciones especiales**: afinaciones alternativas y la escucha previa.
+- **Afinaciones especiales**: afinaciones alternativas y la reproducción de la afinación completa.
 - **Audio y ajustes**: dispositivo, canal de la Scarlett, WASAPI, nivel de entrada,
   calibración, nombres de notas y opciones menos frecuentes.
 
@@ -84,8 +84,8 @@ sustituirán los anuncios de NVDA, JAWS o Narrador.
   afinación o maqam elegido se conserva.
 - `Ctrl+Mayús+Z`: deshacer el último retoque en cuartos de tono (sobre cualquier cuerda, no
   solo la seleccionada).
-- `Ctrl+Mayús+P`: escucha previa de toda la afinación objetivo, cuerda por cuerda desde la
-  más grave a la más aguda.
+- `Ctrl+Mayús+P`: reproducir la afinación completa (todas las cuerdas seguidas, de la más
+  grave a la más aguda).
 - `Ctrl+Mayús+V`: repetir la última instrucción de afinación anunciada.
 
 ## Retoque fino por cuerda (cuartos de tono)
@@ -117,7 +117,7 @@ de golpe los retoques correspondientes sobre la afinación de fábrica.
 La lira Aklot conserva una **afinación fija**: cada maqam ajusta sus 16 cuerdas
 para contener sus siete grados en varias octavas. La cuerda más grave es Sol,
 pero la tónica se indica en el nombre del maqam; por ejemplo, en Bayati sobre Re
-la tónica es Re, aunque la escucha previa comience por Sol grave. La app muestra
+la tónica es Re, aunque la reproducción de la afinación completa comience por Sol grave. La app muestra
 esta aclaración al elegir el maqam.
 
 Esta adaptación es fiel a los grados de la escala dentro de una aproximación de
@@ -182,25 +182,27 @@ de presentación y anuncios: los cálculos siguen usando índices cromáticos y 
 Al intentar subir una cuerda dos semitonos o más sobre su afinación estándar, el afinador
 solicita confirmación para evitar una subida accidental de tensión.
 
-## Escucha previa de la escala
+## Reproducir la afinación completa
 
 `Ctrl+Mayús+P` reproduce, una sola vez y en orden, el tono de referencia de cada cuerda de
 la afinación activa (con sus retoques ya aplicados), para saber de antemano cómo debería
 sonar el instrumento completo antes de afinarlo cuerda por cuerda. Como la mayoría de
 escalas y maqams solo modifican unas pocas cuerdas respecto a la afinación de fábrica, es la
-forma más clara de notar cuáles cambian y cuáles no. Se puede interrumpir a mitad con
-`Ctrl+E` (detiene también la captura del micrófono) o volviendo a pulsar `Ctrl+Mayús+P`.
+forma más clara de notar cuáles cambian y cuáles no. Se puede interrumpir a mitad volviendo
+a pulsar `Ctrl+Mayús+P`, o deteniendo la escucha del micrófono con `Ctrl+E` si estaba activa.
 
-La escucha previa reproduce una vez las notas objetivo completas, desde la cuerda más grave
-hasta la más aguda. Así permite comprobar cómo debe quedar el instrumento sin mezclar la
-afinación de fábrica con otra nota de comparación.
+Reproduce una vez las notas objetivo completas, desde la cuerda más grave hasta la más
+aguda. Así permite comprobar cómo debe quedar el instrumento sin mezclar la afinación de
+fábrica con otra nota de comparación. Es una reproducción por los altavoces: no requiere
+tener la escucha del micrófono encendida ni la sustituye.
 
-## Modo solo escucha
+## Modo identificación de nota
 
-La casilla "Modo solo escucha" desactiva las instrucciones de sube/baja y el pitido de
-confirmación: la app solo dice la nota que detecta en cada momento (por ejemplo "Sol3"),
-sin compararla con ninguna cuerda objetivo. Útil para identificar por oído qué se está
-tocando en vez de afinar hacia una nota concreta.
+La casilla "Modo identificación de nota" desactiva las instrucciones de sube/baja y el
+pitido de confirmación: la app solo dice la nota que detecta en cada momento (por ejemplo
+"Sol3"), sin compararla con ninguna cuerda objetivo. Útil para identificar por oído qué se
+está tocando en vez de afinar hacia una nota concreta. Sigue usando el micrófono — es un
+modo de la escucha (`Ctrl+E`), no una función independiente.
 
 ## Detección automática de cuerda
 

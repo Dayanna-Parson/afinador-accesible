@@ -9,7 +9,7 @@ revisar la parte musical sin necesitar el repositorio de Maqamusic instalado.
 2. `tests/test_maqamat.py`: pruebas que convierten los grados en el ajuste de
    las dieciséis cuerdas.
 3. `app/motor_audio.py`: conversión de nota, cents y frecuencia.
-4. `app/interfaz/ventana_principal.py`: selección de escala y escucha previa.
+4. `app/interfaz/ventana_principal.py`: selección de escala y reproducción de la afinación completa.
 5. `documentos/maqamat/FUENTES_Y_METODOLOGIA.md`: alcance, fuente y licencia.
 
 ## Preguntas obligatorias antes de cambiar un maqam
