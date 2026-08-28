@@ -95,8 +95,12 @@ motor_rust/
 ├── pyproject.toml       # Configuración de maturin
 └── src/lib.rs           # listar_dispositivos_entrada(), CapturadorYinRust (cpal + YIN)
 tests/
-└── test_motor_audio.py  # YIN contra cuerdas pulsadas sintéticas (armónicos + ruido), conversión
+├── test_motor_audio.py  # YIN contra cuerdas pulsadas sintéticas (armónicos + ruido), conversión
 │                          # de notas, cálculo de instrucción
+├── test_maqamat.py      # Coherencia musical de las afinaciones de lira (sin cuerdas duplicadas,
+│                          # cada maqam coincide con sus siete grados de referencia)
+├── test_perfiles_afinacion.py  # Separación de perfiles por instrumento y migración de los antiguos
+└── test_gestor_ajustes.py      # Migración y copias rotativas de ajustes
 iniciar_afinador.py        # Punto de entrada, configura logging a afinador.log
 requisitos.txt             # Dependencias de Python
 INICIAR_AFINADOR.bat        # Lanzador para Windows

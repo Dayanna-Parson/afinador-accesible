@@ -297,6 +297,9 @@ app/
 ├── conector_nvda.py   # Salida de voz al lector de pantalla activo, con throttling por estabilidad
 ├── interfaz/          # Ventana principal y recursos de interfaz wxPython
 ├── interfaz_gui.py    # Fachada de compatibilidad para importaciones anteriores
+├── presets_instrumento.py  # Presets de instrumento y escalas/afinaciones, sin wxPython
+├── afinaciones_maqam_lira.py  # Catálogo de los 25 maqamat de la lira, sin wxPython
+├── perfiles_afinacion.py  # Perfiles de afinación guardados por instrumento
 ├── gestor_ajustes.py  # Persistencia atómica de ajustes en configuraciones/ajustes.json
 ├── control_microfono.py  # Desmute automático del micrófono a nivel de Windows (pycaw)
 └── config_rutas.py    # Rutas absolutas del proyecto
