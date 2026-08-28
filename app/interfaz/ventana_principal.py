@@ -818,7 +818,7 @@ class VentanaPrincipal(wx.Frame):
         if instrumento == NOMBRE_LIRA:
             familia = self.selector_familia_maqam.GetStringSelection()
             maqamat = (
-                tuple(AFINACIONES_LIRA_MAQAM_24EDO)
+                tuple(ESCALAS_POR_INSTRUMENTO[NOMBRE_LIRA])
                 if familia == "Todas las familias"
                 else FAMILIAS_MAQAM_LIRA.get(familia, ())
             )
