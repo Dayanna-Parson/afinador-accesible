@@ -19,6 +19,7 @@ app/
   motor_audio.py                  Captura de audio, YIN y tonos de referencia.
   afinaciones_maqam_lira.py       Presets estáticos de lira en 24-EDO.
   perfiles_afinacion.py           Perfiles de afinación guardados por instrumento.
+  gestor_atajos.py                Atajos de teclado configurables (defaults + overrides).
   conector_nvda.py                Anuncios al lector de pantalla.
   gestor_ajustes.py               Ajustes persistentes.
   control_microfono.py            Desmuteo opcional de entrada Windows.
@@ -28,6 +29,7 @@ tests/
   test_motor_audio.py             Detección, notas, instrucciones y reproducción.
   test_maqamat.py                 Coherencia musical de las afinaciones de lira.
   test_perfiles_afinacion.py      Separación y migración de perfiles por instrumento.
+  test_gestor_atajos.py           Fusión de defaults y overrides de atajos de teclado.
   test_gestor_ajustes.py          Migración y copias de seguridad de ajustes.
 
 motor_rust/                       Aceleración opcional de captura; Python sigue siendo respaldo.

@@ -85,6 +85,7 @@ app/
 ├── presets_instrumento.py  # PRESETS_INSTRUMENTO, ESCALAS_POR_INSTRUMENTO (sin wx, para pruebas)
 ├── afinaciones_maqam_lira.py  # Catálogo de maqamat de la lira, sin wx
 ├── perfiles_afinacion.py  # Perfiles de afinación guardados por instrumento
+├── gestor_atajos.py     # Atajos de teclado configurables: defaults + overrides de usuario
 ├── gestor_ajustes.py    # cargar_ajustes()/guardar_ajustes(): persistencia atómica en
 │                        # configuraciones/ajustes.json
 ├── control_microfono.py # asegurar_microfono_activo(): desmute opcional a nivel de
@@ -100,7 +101,8 @@ tests/
 ├── test_maqamat.py      # Coherencia musical de las afinaciones de lira (sin cuerdas duplicadas,
 │                          # cada maqam coincide con sus siete grados de referencia)
 ├── test_perfiles_afinacion.py  # Separación de perfiles por instrumento y migración de los antiguos
-└── test_gestor_ajustes.py      # Migración y copias rotativas de ajustes
+├── test_gestor_ajustes.py      # Migración y copias rotativas de ajustes
+└── test_gestor_atajos.py       # Fusión de defaults y overrides de atajos de teclado
 iniciar_afinador.py        # Punto de entrada, configura logging a afinador.log
 requisitos.txt             # Dependencias de Python
 INICIAR_AFINADOR.bat        # Lanzador para Windows
@@ -188,21 +190,39 @@ dude de si el retoque se aplicó de verdad.
 ### Micrófonos con cancelación de ruido por IA
 Los portátiles con reducción de ruido inteligente en el micrófono (Lenovo Vantage y similares) están entrenados para reconocer voz humana y suelen filtrar el sonido de instrumentos acústicos como si fuera ruido de fondo. Documentado en el README: hay que desactivar esa función para poder usar el afinador con el micrófono integrado.
 
-### Atajos de teclado: nunca la tecla Espacio
-Todos declarados en una única `wx.AcceleratorTable` a nivel de `wx.Frame`
-(`VentanaPrincipal._construir_atajos`, `app/interfaz/ventana_principal.py`):
+### Atajos de teclado configurables: nunca la tecla Espacio
+Ocho atajos son configurables vía `app/gestor_atajos.py` (mismo patrón que Epub TTS
+Accesible: `teclas_predeterminadas.json` con los valores de fábrica, nunca tocado a mano,
+y `teclas_usuario.json` solo con los overrides — se fusionan al cargar con `cargar_atajos()`).
+`VentanaPrincipal._configurar_aceleradores_globales()` reconstruye la `wx.AcceleratorTable`
+del `wx.Frame` a partir de ese diccionario en cada arranque y cada vez que se reasigna, quita
+o restablece un atajo desde `_DialogoAtajos` (botón "Personalizar atajos de teclado..." en
+Audio y ajustes) — nunca hace falta reiniciar la app para que un cambio surta efecto.
+`NOMBRES_METODO_ATAJO` mapea cada clave del JSON al nombre del método que la ejecuta
+(resuelto con `getattr` en tiempo de ejecución, no una tabla de `wx.NewIdRef()` fija).
 
-| Atajo | Acción |
-|---|---|
-| `Ctrl+P` | Reproducir el tono de referencia de la cuerda/nota seleccionada |
-| `Ctrl+E` | Iniciar/detener la escucha del micrófono |
-| `Ctrl+Mayús+Flecha arriba/abajo` | Retocar la cuerda seleccionada en cuartos de tono |
-| `Ctrl+Mayús+R` | Restablecer el retoque de la cuerda seleccionada |
-| `Ctrl+Mayús+Z` | Deshacer el último retoque en cuartos de tono (cualquier cuerda, vía `self._historial_retoques`) |
-| `Ctrl+Mayús+P` | Reproducir la afinación completa activa, todas las cuerdas seguidas (`GeneradorTonos.reproducir_secuencia`) |
-| `Ctrl+Mayús+V` | Repetir la última instrucción de afinación anunciada |
+| Clave (gestor_atajos) | Atajo de fábrica | Acción |
+|---|---|---|
+| `reproducir_referencia` | `Ctrl+P` | Reproducir el tono de referencia de la cuerda/nota seleccionada |
+| `alternar_escucha` | `Ctrl+E` | Iniciar/detener la escucha del micrófono |
+| `subir_cuarto_tono` / `bajar_cuarto_tono` | `Ctrl+Mayús+Flecha arriba/abajo` | Retocar la cuerda seleccionada en cuartos de tono |
+| `restablecer_ajuste_fino` | `Ctrl+Mayús+R` | Restablecer el retoque de la cuerda seleccionada |
+| `deshacer_retoque` | `Ctrl+Mayús+Z` | Deshacer el último retoque en cuartos de tono (cualquier cuerda, vía `self._historial_retoques`) |
+| `escucha_previa_escala` | `Ctrl+Mayús+P` | Reproducir la afinación completa activa, todas las cuerdas seguidas (`GeneradorTonos.reproducir_secuencia`) |
+| `repetir_instruccion` | `Ctrl+Mayús+V` | Repetir la última instrucción de afinación anunciada |
 
-Prohibido usar `Espacio` como atajo: es la tecla con la que NVDA activa controles con foco, y un atajo global en Espacio compite con eso. Si se añaden más atajos, mantenerlos todos en la misma tabla central del frame — no dupliques el mismo atajo en un panel hijo y en el frame a la vez, o la ambigüedad puede disparar el manejador equivocado.
+`F1`, `Ctrl+1/2/3` y la tecla Menú/Mayús+F10 quedan **fuera** de `gestor_atajos.py`: se
+despachan por su propio manejador de teclado (`_al_navegacion_con_tab`, `EVT_CONTEXT_MENU`)
+y no compiten por la misma tecla que los ocho de arriba, así que no hace falta que sean
+reasignables — reasignarlos rompería convenciones fijadas en toda la app (F1 es "ayuda" en
+todos lados; Ctrl+1/2/3 es "cambiar de pestaña").
+
+`_DialogoCapturaTecla` (la ventana modal que espera la pulsación al reasignar) impide
+explícitamente asignar `Espacio` solo, sin modificador: es la tecla con la que NVDA activa
+controles con foco, y un atajo global ahí compite con eso. Si se añade un atajo nuevo,
+añadirlo también a `_DEFAULTS_EMBEBIDOS` (`gestor_atajos.py`) y a `NOMBRES_METODO_ATAJO`
+(`ventana_principal.py`) — nunca lo dupliques en un panel hijo aparte de la tabla central del
+frame, o la ambigüedad puede disparar el manejador equivocado.
 
 ### Menú contextual (siguiendo el patrón de Epub TTS Accesible)
 `_al_menu_contextual` (bindado a `wx.EVT_CONTEXT_MENU` en el frame: clic derecho, tecla
@@ -212,9 +232,8 @@ distinto (libro, fragmento...). El afinador no tiene esa variedad de contenido p
 así que un solo menú global basta: ayuda, ver atajos, visitar tiflotutos.com, y las tres
 acciones sobre `registros/` (abrir la carpeta, copiar el log completo o solo el último
 error al portapapeles) — mismos nombres y comportamiento que en Epub TTS, para quien ya
-conoce esa app. "Ver atajos de teclado" muestra una lista estática (no hay un
-`gestor_atajos.py` configurable en este proyecto, los atajos son fijos en la
-`AcceleratorTable`): si se añade o cambia un atajo, hay que actualizar también esa lista.
+conoce esa app. "Ver atajos de teclado" lee `cargar_atajos()` en vivo (ya no es una lista
+estática): si se añade o cambia un atajo en `gestor_atajos.py`, este ítem se actualiza solo.
 
 ### Modo identificación de nota
 La casilla `casilla_modo_solo_escucha` (etiqueta visible "Modo identificación de nota";

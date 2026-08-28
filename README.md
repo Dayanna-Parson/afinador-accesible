@@ -79,8 +79,11 @@ error al portapapeles) — sin tener que ir a buscar los archivos a mano.
 
 ## Atajos de teclado
 
-- `F1`: abrir la ayuda local.
-- `Ctrl+1`, `Ctrl+2`, `Ctrl+3`: abrir Afinar, Afinaciones especiales o Audio y ajustes.
+Los ocho de abajo se pueden reasignar desde "Audio y ajustes" → "Personalizar
+atajos de teclado..." (o desde el menú contextual → "Ver atajos de teclado"
+para consultar los actuales sin abrir el diálogo). Las teclas aquí son las de
+fábrica:
+
 - `Ctrl+P`: reproducir el tono de referencia de la cuerda/nota seleccionada.
 - `Ctrl+E`: iniciar o detener la escucha del micrófono.
 - `Ctrl+Mayús+Flecha arriba` / `Ctrl+Mayús+Flecha abajo`: subir o bajar la cuerda seleccionada
@@ -92,6 +95,12 @@ error al portapapeles) — sin tener que ir a buscar los archivos a mano.
 - `Ctrl+Mayús+P`: reproducir la afinación completa (todas las cuerdas seguidas, de la más
   grave a la más aguda).
 - `Ctrl+Mayús+V`: repetir la última instrucción de afinación anunciada.
+
+Fijos, no reasignables:
+
+- `F1`: abrir la ayuda local.
+- `Ctrl+1`, `Ctrl+2`, `Ctrl+3`: abrir Afinar, Afinaciones especiales o Audio y ajustes.
+- Tecla Menú / `Mayús+F10`: abrir el menú contextual (ver más abajo).
 
 ## Retoque fino por cuerda (cuartos de tono)
 
@@ -233,6 +242,10 @@ opciones de anuncios) se guarda en `configuraciones/configuracion_audio.json`. L
 mantienen sus propias diez copias anteriores, en carpetas separadas. El antiguo
 `configuraciones/ajustes.json` se conserva intacto como respaldo de migración.
 
+Los atajos de teclado personalizados viven aparte, en
+`configuraciones/teclas_usuario.json` (solo los que hayas reasignado;
+`configuraciones/teclas_predeterminadas.json` guarda los valores de fábrica y nunca se toca a mano).
+
 ## Registros y diagnóstico de cierres
 
 El registro detallado se guarda en `registros/afinador.log` y rota al alcanzar 2 MB
@@ -305,6 +318,7 @@ app/
 ├── presets_instrumento.py  # Presets de instrumento y escalas/afinaciones, sin wxPython
 ├── afinaciones_maqam_lira.py  # Catálogo de los 25 maqamat de la lira, sin wxPython
 ├── perfiles_afinacion.py  # Perfiles de afinación guardados por instrumento
+├── gestor_atajos.py    # Atajos de teclado configurables: defaults + overrides de usuario
 ├── gestor_ajustes.py  # Persistencia atómica de ajustes en configuraciones/ajustes.json
 ├── control_microfono.py  # Desmute automático del micrófono a nivel de Windows (pycaw)
 └── config_rutas.py    # Rutas absolutas del proyecto

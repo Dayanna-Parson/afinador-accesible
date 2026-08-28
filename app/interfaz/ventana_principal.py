@@ -27,6 +27,14 @@ from app.motor_audio import (
 from app.conector_nvda import AnunciadorNVDA
 from app.control_microfono import asegurar_microfono_activo
 from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
+from app.gestor_atajos import (
+    cargar_atajos,
+    cargar_defaults as cargar_atajos_defecto,
+    eliminar_atajo_usuario,
+    guardar_atajo_usuario,
+    restablecer_todos as restablecer_todos_los_atajos,
+    texto_atajo,
+)
 from app.perfiles_afinacion import guardar_perfil, migrar_perfiles, nombres_perfiles
 from app.config_rutas import RUTA_AYUDA, RUTA_ERRORES, RUTA_REGISTROS
 from app.afinaciones_maqam_lira import (
@@ -79,14 +87,56 @@ OPCIONES_PASO_RETOQUE = [
     ("Tono", 4),
 ]
 
-ID_ATAJO_REPRODUCIR_REFERENCIA = wx.NewIdRef()
-ID_ATAJO_ALTERNAR_ESCUCHA = wx.NewIdRef()
-ID_ATAJO_SUBIR_CUARTO_TONO = wx.NewIdRef()
-ID_ATAJO_BAJAR_CUARTO_TONO = wx.NewIdRef()
-ID_ATAJO_RESTABLECER_AJUSTE_FINO = wx.NewIdRef()
-ID_ATAJO_ESCUCHA_PREVIA_ESCALA = wx.NewIdRef()
-ID_ATAJO_DESHACER_RETOQUE = wx.NewIdRef()
-ID_ATAJO_REPETIR_INSTRUCCION = wx.NewIdRef()
+# Mapa clave de gestor_atajos.py -> método que ejecuta ese atajo. El nombre del
+# método se resuelve en tiempo de ejecución (getattr) para poder reconstruir la
+# tabla de aceleradores dinámicamente sin una lista de wx.NewIdRef() fijos.
+NOMBRES_METODO_ATAJO = {
+    "reproducir_referencia": "_al_reproducir_referencia",
+    "alternar_escucha": "_al_alternar_escucha",
+    "subir_cuarto_tono": "_al_subir_cuarto_tono",
+    "bajar_cuarto_tono": "_al_bajar_cuarto_tono",
+    "restablecer_ajuste_fino": "_al_restablecer_ajuste_fino",
+    "escucha_previa_escala": "_al_escucha_previa_escala",
+    "deshacer_retoque": "_al_deshacer_retoque",
+    "repetir_instruccion": "_al_repetir_instruccion",
+}
+
+
+def _modificador_a_flag(modificador):
+    """Convierte 'Ctrl', 'Alt', 'Ctrl+Shift'... al flag wx.ACCEL_* correspondiente."""
+    mapa = {
+        "": wx.ACCEL_NORMAL,
+        "Ctrl": wx.ACCEL_CTRL,
+        "Alt": wx.ACCEL_ALT,
+        "Shift": wx.ACCEL_SHIFT,
+        "Ctrl+Alt": wx.ACCEL_CTRL | wx.ACCEL_ALT,
+        "Ctrl+Shift": wx.ACCEL_CTRL | wx.ACCEL_SHIFT,
+        "Alt+Shift": wx.ACCEL_ALT | wx.ACCEL_SHIFT,
+        "Ctrl+Alt+Shift": wx.ACCEL_CTRL | wx.ACCEL_ALT | wx.ACCEL_SHIFT,
+    }
+    return mapa.get(modificador)
+
+
+def _nombre_tecla_a_keycode(nombre):
+    """Convierte 'A', 'Arriba', 'F5'... al código de tecla wx correspondiente."""
+    mapa = {
+        "Espacio": wx.WXK_SPACE, "Intro": wx.WXK_RETURN,
+        "F1": wx.WXK_F1, "F2": wx.WXK_F2, "F3": wx.WXK_F3, "F4": wx.WXK_F4,
+        "F5": wx.WXK_F5, "F6": wx.WXK_F6, "F7": wx.WXK_F7, "F8": wx.WXK_F8,
+        "F9": wx.WXK_F9, "F10": wx.WXK_F10, "F11": wx.WXK_F11, "F12": wx.WXK_F12,
+        "Arriba": wx.WXK_UP, "Abajo": wx.WXK_DOWN,
+        "Izquierda": wx.WXK_LEFT, "Derecha": wx.WXK_RIGHT,
+        "Inicio": wx.WXK_HOME, "Fin": wx.WXK_END,
+        "RePág": wx.WXK_PAGEUP, "AvPág": wx.WXK_PAGEDOWN,
+        "Tab": wx.WXK_TAB, "Retroceso": wx.WXK_BACK,
+        "Supr": wx.WXK_DELETE, "Insert": wx.WXK_INSERT,
+    }
+    if nombre in mapa:
+        return mapa[nombre]
+    if len(nombre) == 1:
+        return ord(nombre.upper())
+    return -1
+
 
 NIVEL_MINIMO_SENAL_DIAGNOSTICO = 0.01
 NIVEL_SENAL_BUENA = 0.08
@@ -94,6 +144,211 @@ SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL = 4.0
 SEGUNDOS_ESTABLE_PARA_AVANZAR = 1.2
 SEGUNDOS_MARGEN_SILENCIO_ENTRE_NOTAS = 0.5
 TAMANO_HISTORIAL_FRECUENCIAS = 5
+
+
+# ANCLAJE_INICIO: DIALOGO_CAPTURA_TECLA
+class _DialogoCapturaTecla(wx.Dialog):
+    """Diálogo modal que espera una pulsación de tecla y la guarda como (modificador, tecla).
+
+    Escape cancela sin cambios; cualquier otra combinación confirma en cuanto se suelta.
+    """
+
+    _ESPECIALES = {
+        wx.WXK_SPACE: "Espacio", wx.WXK_RETURN: "Intro",
+        wx.WXK_F1: "F1", wx.WXK_F2: "F2", wx.WXK_F3: "F3", wx.WXK_F4: "F4",
+        wx.WXK_F5: "F5", wx.WXK_F6: "F6", wx.WXK_F7: "F7", wx.WXK_F8: "F8",
+        wx.WXK_F9: "F9", wx.WXK_F10: "F10", wx.WXK_F11: "F11", wx.WXK_F12: "F12",
+        wx.WXK_UP: "Arriba", wx.WXK_DOWN: "Abajo",
+        wx.WXK_LEFT: "Izquierda", wx.WXK_RIGHT: "Derecha",
+        wx.WXK_HOME: "Inicio", wx.WXK_END: "Fin",
+        wx.WXK_PAGEUP: "RePág", wx.WXK_PAGEDOWN: "AvPág",
+        wx.WXK_TAB: "Tab", wx.WXK_BACK: "Retroceso",
+        wx.WXK_DELETE: "Supr", wx.WXK_INSERT: "Insert",
+    }
+
+    def __init__(self, padre, descripcion_atajo):
+        super().__init__(padre, title="Asignar tecla", style=wx.DEFAULT_DIALOG_STYLE | wx.STAY_ON_TOP)
+        self.resultado = None
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        etiqueta = wx.StaticText(self, label=(
+            "Atajo: {}\n\n"
+            "Presiona la combinación de teclas que quieres asignar.\n"
+            "Prohibido usar la tecla Espacio sola. Escape para cancelar sin cambios."
+        ).format(descripcion_atajo))
+        sizer.Add(etiqueta, 0, wx.ALL, 20)
+        self.etiqueta_capturada = wx.StaticText(self, label="Esperando tecla...")
+        sizer.Add(self.etiqueta_capturada, 0, wx.ALIGN_CENTER | wx.BOTTOM, 20)
+        self.SetSizer(sizer)
+        self.Fit()
+        self.CenterOnParent()
+        self.Bind(wx.EVT_CHAR_HOOK, self._al_capturar)
+
+    def _al_capturar(self, evento):
+        tecla = evento.GetKeyCode()
+        if tecla == wx.WXK_ESCAPE:
+            self.resultado = None
+            self.EndModal(wx.ID_CANCEL)
+            return
+        if tecla in (wx.WXK_SHIFT, wx.WXK_CONTROL, wx.WXK_ALT,
+                     wx.WXK_WINDOWS_LEFT, wx.WXK_WINDOWS_RIGHT, wx.WXK_WINDOWS_MENU):
+            return
+        modificadores = []
+        if evento.ControlDown():
+            modificadores.append("Ctrl")
+        if evento.AltDown():
+            modificadores.append("Alt")
+        if evento.ShiftDown():
+            modificadores.append("Shift")
+        if tecla in self._ESPECIALES:
+            nombre_tecla = self._ESPECIALES[tecla]
+        elif 32 <= tecla <= 127:
+            nombre_tecla = chr(tecla).upper()
+        else:
+            return
+        if not modificadores and nombre_tecla == "Espacio":
+            # Regla de toda la app: Espacio nunca es un atajo global por sí solo,
+            # compite con cómo NVDA activa el control que tenga el foco.
+            self.etiqueta_capturada.SetLabel("Espacio no puede usarse solo. Prueba otra combinación.")
+            return
+        self.resultado = ("+".join(modificadores), nombre_tecla)
+        combo = "{}+{}".format("+".join(modificadores), nombre_tecla) if modificadores else nombre_tecla
+        self.etiqueta_capturada.SetLabel("Asignando: {}".format(combo))
+        self.EndModal(wx.ID_OK)
+# ANCLAJE_FIN: DIALOGO_CAPTURA_TECLA
+
+
+# ANCLAJE_INICIO: DIALOGO_ATAJOS
+class _DialogoAtajos(wx.Dialog):
+    """Lista los atajos configurables y permite reasignar, quitar o restablecer todos."""
+
+    def __init__(self, padre):
+        super().__init__(
+            padre, title="Personalizar atajos de teclado",
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+        )
+        self._ventana_principal = padre
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(wx.StaticText(self, label=(
+            "Selecciona un atajo y pulsa Intro o \"Asignar nueva tecla\" para cambiarlo. "
+            "La tecla de fábrica aparece entre paréntesis junto al nombre."
+        )), 0, wx.ALL, 10)
+
+        self.lista = wx.ListCtrl(self, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
+        self.lista.InsertColumn(0, "Acción (tecla de fábrica entre paréntesis)", width=380)
+        self.lista.InsertColumn(1, "Tecla asignada actualmente", width=220)
+        self.lista.SetHelpText(
+            "Lista de acciones con su atajo. Flechas arriba/abajo para navegar; "
+            "Intro abre el diálogo de asignación de la acción seleccionada."
+        )
+        self.lista.Bind(wx.EVT_KEY_DOWN, self._al_tecla_lista)
+        sizer.Add(self.lista, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        fila_botones = wx.BoxSizer(wx.HORIZONTAL)
+        self.boton_asignar = wx.Button(self, label="Asignar nueva tecla al atajo seleccionado")
+        self.boton_asignar.Bind(wx.EVT_BUTTON, self._al_asignar)
+        self.boton_eliminar = wx.Button(self, label="Quitar personalización de este atajo")
+        self.boton_eliminar.SetHelpText("Vuelve este atajo concreto a su tecla de fábrica.")
+        self.boton_eliminar.Bind(wx.EVT_BUTTON, self._al_eliminar)
+        self.boton_restablecer = wx.Button(self, label="Restablecer todos los atajos de fábrica")
+        self.boton_restablecer.Bind(wx.EVT_BUTTON, self._al_restablecer)
+        fila_botones.Add(self.boton_asignar, 0, wx.RIGHT, 10)
+        fila_botones.Add(self.boton_eliminar, 0, wx.RIGHT, 10)
+        fila_botones.Add(self.boton_restablecer, 0)
+        sizer.Add(fila_botones, 0, wx.ALL, 10)
+
+        caja_fijos = wx.StaticBox(self, label="Atajos fijos (no se pueden reasignar)")
+        sizer_fijos = wx.StaticBoxSizer(caja_fijos, wx.VERTICAL)
+        for atajo, descripcion in (
+            ("F1", "Abrir la ayuda local"),
+            ("Ctrl+1, Ctrl+2, Ctrl+3", "Cambiar a Afinar, Afinaciones especiales o Audio y ajustes"),
+            ("Tecla Menú / Mayús+F10", "Abrir el menú contextual"),
+        ):
+            sizer_fijos.Add(wx.StaticText(self, label="  {:<24}  {}".format(atajo, descripcion)), 0, wx.LEFT | wx.TOP, 4)
+        sizer.Add(sizer_fijos, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        boton_cerrar = wx.Button(self, wx.ID_CLOSE, "Cerrar")
+        boton_cerrar.Bind(wx.EVT_BUTTON, lambda evento: self.EndModal(wx.ID_CLOSE))
+        sizer.Add(boton_cerrar, 0, wx.ALIGN_RIGHT | wx.ALL, 10)
+
+        self.SetSizer(sizer)
+        self.SetSize((640, 480))
+        self._rellenar_lista()
+
+    def _rellenar_lista(self):
+        self._atajos = cargar_atajos()
+        self._defaults = cargar_atajos_defecto()
+        self._claves = list(self._atajos.keys())
+        self.lista.DeleteAllItems()
+        self.lista.Freeze()
+        try:
+            for indice, clave in enumerate(self._claves):
+                entrada = self._atajos[clave]
+                entrada_defecto = self._defaults.get(clave, {})
+                descripcion = entrada.get("descripcion", clave)
+                tecla_defecto = texto_atajo(entrada_defecto)
+                tecla_actual = texto_atajo(entrada)
+                columna_accion = "{} ({})".format(descripcion, tecla_defecto)
+                columna_tecla = (
+                    tecla_actual if tecla_actual == tecla_defecto
+                    else "{}  [personalizada]".format(tecla_actual)
+                )
+                self.lista.InsertItem(indice, columna_accion)
+                self.lista.SetItem(indice, 1, columna_tecla)
+        finally:
+            self.lista.Thaw()
+        if self.lista.GetItemCount() > 0:
+            self.lista.Select(0)
+
+    def _al_tecla_lista(self, evento):
+        if evento.GetKeyCode() == wx.WXK_RETURN:
+            self._al_asignar(None)
+        else:
+            evento.Skip()
+
+    def _refrescar_aceleradores(self):
+        self._ventana_principal._configurar_aceleradores_globales()
+
+    def _al_asignar(self, evento):
+        indice = self.lista.GetFirstSelected()
+        if indice == -1:
+            wx.MessageBox("Selecciona un atajo de la lista primero.", "Aviso")
+            return
+        clave = self._claves[indice]
+        descripcion = self._atajos[clave].get("descripcion", clave)
+        dialogo = _DialogoCapturaTecla(self, descripcion)
+        if dialogo.ShowModal() == wx.ID_OK and dialogo.resultado:
+            modificador, tecla = dialogo.resultado
+            guardar_atajo_usuario(clave, modificador, tecla)
+            self._rellenar_lista()
+            self._refrescar_aceleradores()
+            if indice < self.lista.GetItemCount():
+                self.lista.Select(indice)
+                self.lista.EnsureVisible(indice)
+        dialogo.Destroy()
+
+    def _al_eliminar(self, evento):
+        indice = self.lista.GetFirstSelected()
+        if indice == -1:
+            wx.MessageBox("Selecciona un atajo de la lista primero.", "Aviso")
+            return
+        clave = self._claves[indice]
+        eliminar_atajo_usuario(clave)
+        self._rellenar_lista()
+        self._refrescar_aceleradores()
+        if indice < self.lista.GetItemCount():
+            self.lista.Select(indice)
+
+    def _al_restablecer(self, evento):
+        if wx.MessageBox(
+            "¿Restablecer todos los atajos a sus valores de fábrica?",
+            "Confirmar", wx.YES_NO | wx.ICON_QUESTION,
+        ) == wx.YES:
+            restablecer_todos_los_atajos()
+            self._rellenar_lista()
+            self._refrescar_aceleradores()
+# ANCLAJE_FIN: DIALOGO_ATAJOS
 
 
 # ANCLAJE_INICIO: ventana_principal
@@ -394,6 +649,13 @@ class VentanaPrincipal(wx.Frame):
             "Cambia cómo se muestran y se verbalizan las notas detectadas y objetivo. No altera frecuencias ni afinaciones."
         )
         self.selector_nomenclatura.Bind(wx.EVT_RADIOBOX, self._al_cambiar_nomenclatura)
+
+        self.boton_atajos = wx.Button(self.pagina_audio, label="Personalizar atajos de teclado...")
+        self.boton_atajos.SetHelpText(
+            "Abre un diálogo para reasignar, quitar o restablecer los atajos de teclado configurables."
+        )
+        self.boton_atajos.Bind(wx.EVT_BUTTON, self._al_abrir_dialogo_atajos)
+
         self._organizar_pagina(
             self.pagina_audio,
             ("Entrada de audio", (etiqueta_dispositivo, self.selector_dispositivo, etiqueta_canal,
@@ -404,6 +666,7 @@ class VentanaPrincipal(wx.Frame):
                                       etiqueta_sensibilidad, self.control_sensibilidad)),
             ("Referencia e indicaciones", (etiqueta_la4, self.control_la4, etiqueta_verbosidad,
                                             self.selector_verbosidad, self.selector_nomenclatura)),
+            ("Personalización", (self.boton_atajos,)),
         )
         principal.Add(self.cuaderno, 1, wx.EXPAND | wx.ALL, 8)
         self.SetSizer(principal)
@@ -425,7 +688,7 @@ class VentanaPrincipal(wx.Frame):
                 self.selector_dispositivo, self.selector_canal, self.casilla_exclusivo_wasapi,
                 self.casilla_desmutear_microfono, self.selector_tasa, self.selector_buffer,
                 self.control_ganancia, self.control_sensibilidad, self.control_la4, self.selector_verbosidad,
-                self.selector_nomenclatura,
+                self.selector_nomenclatura, self.boton_atajos,
             ),
         }
         self.Bind(wx.EVT_CHAR_HOOK, self._al_navegacion_con_tab)
@@ -519,30 +782,34 @@ class VentanaPrincipal(wx.Frame):
             self.anunciador.hablar("No se pudo abrir la ayuda local.")
 
     def _construir_atajos(self):
-        """Ctrl+P reproduce el tono de referencia, Ctrl+E enciende o apaga la escucha del
-        micrófono, Ctrl+Mayús+Flecha arriba/abajo retoca la cuerda seleccionada en cuartos de
-        tono, Ctrl+Mayús+R restablece ese retoque, Ctrl+Mayús+Z deshace el último retoque, y
-        Ctrl+Mayús+P reproduce la afinación completa activa (todas las cuerdas seguidas), y
-        Ctrl+Mayús+V repite la última instrucción de afinación. Nunca se usa la tecla Espacio."""
-        self.Bind(wx.EVT_MENU, self._al_reproducir_referencia, id=ID_ATAJO_REPRODUCIR_REFERENCIA)
-        self.Bind(wx.EVT_MENU, self._al_alternar_escucha, id=ID_ATAJO_ALTERNAR_ESCUCHA)
-        self.Bind(wx.EVT_MENU, self._al_subir_cuarto_tono, id=ID_ATAJO_SUBIR_CUARTO_TONO)
-        self.Bind(wx.EVT_MENU, self._al_bajar_cuarto_tono, id=ID_ATAJO_BAJAR_CUARTO_TONO)
-        self.Bind(wx.EVT_MENU, self._al_restablecer_ajuste_fino, id=ID_ATAJO_RESTABLECER_AJUSTE_FINO)
-        self.Bind(wx.EVT_MENU, self._al_escucha_previa_escala, id=ID_ATAJO_ESCUCHA_PREVIA_ESCALA)
-        self.Bind(wx.EVT_MENU, self._al_deshacer_retoque, id=ID_ATAJO_DESHACER_RETOQUE)
-        self.Bind(wx.EVT_MENU, self._al_repetir_instruccion, id=ID_ATAJO_REPETIR_INSTRUCCION)
-        tabla = wx.AcceleratorTable([
-            (wx.ACCEL_CTRL, ord("P"), ID_ATAJO_REPRODUCIR_REFERENCIA),
-            (wx.ACCEL_CTRL, ord("E"), ID_ATAJO_ALTERNAR_ESCUCHA),
-            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, wx.WXK_UP, ID_ATAJO_SUBIR_CUARTO_TONO),
-            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, wx.WXK_DOWN, ID_ATAJO_BAJAR_CUARTO_TONO),
-            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("R"), ID_ATAJO_RESTABLECER_AJUSTE_FINO),
-            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("P"), ID_ATAJO_ESCUCHA_PREVIA_ESCALA),
-            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("Z"), ID_ATAJO_DESHACER_RETOQUE),
-            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("V"), ID_ATAJO_REPETIR_INSTRUCCION),
-        ])
-        self.SetAcceleratorTable(tabla)
+        self._ids_atajos_global = {}
+        self._configurar_aceleradores_globales()
+
+    def _configurar_aceleradores_globales(self):
+        """Reconstruye la tabla de aceleradores a partir de gestor_atajos.cargar_atajos().
+
+        Se llama al arranque y cada vez que se reasigna, elimina o restablece un
+        atajo desde el diálogo de personalización, para que el cambio surta
+        efecto sin reiniciar la aplicación. Reutiliza los mismos wx.NewIdRef()
+        entre reconstrucciones (guardados en self._ids_atajos_global) para no
+        acumular identificadores sin usar en cada llamada.
+        """
+        atajos = cargar_atajos()
+        entradas = []
+        for clave, entrada in atajos.items():
+            flag = _modificador_a_flag(entrada.get("modificador", ""))
+            keycode = _nombre_tecla_a_keycode(entrada.get("tecla", ""))
+            if flag is None or keycode < 0:
+                logger.warning("atajo '%s' con modificador/tecla no válidos, se ignora", clave)
+                continue
+            if clave not in self._ids_atajos_global:
+                self._ids_atajos_global[clave] = wx.NewIdRef()
+            id_atajo = self._ids_atajos_global[clave]
+            entradas.append((flag, keycode, id_atajo))
+            metodo = getattr(self, NOMBRES_METODO_ATAJO[clave])
+            self.Bind(wx.EVT_MENU, metodo, id=id_atajo)
+        if entradas:
+            self.SetAcceleratorTable(wx.AcceleratorTable(entradas))
 
     def _cargar_dispositivos(self):
         self.dispositivos = listar_dispositivos_entrada()
@@ -1802,6 +2069,11 @@ class VentanaPrincipal(wx.Frame):
         self._guardar_ajustes_actuales()
         evento.Skip()
 
+    def _al_abrir_dialogo_atajos(self, evento):
+        dialogo = _DialogoAtajos(self)
+        dialogo.ShowModal()
+        dialogo.Destroy()
+
     def _al_menu_contextual(self, evento):
         """Menú contextual único: no hay distintos tipos de elemento por pestaña
         como en Epub TTS, así que aquí basta un solo menú accesible desde cualquiera."""
@@ -1838,18 +2110,16 @@ class VentanaPrincipal(wx.Frame):
         menu.Destroy()
 
     def _al_ver_atajos(self, evento):
-        lineas = [
-            "F1: abrir la ayuda local.",
-            "Ctrl+1, Ctrl+2, Ctrl+3: abrir Afinar, Afinaciones especiales o Audio y ajustes.",
-            "Ctrl+P: reproducir el tono de referencia de la cuerda/nota seleccionada.",
-            "Ctrl+E: iniciar o detener la escucha del micrófono.",
-            "Ctrl+Mayús+Flecha arriba / Ctrl+Mayús+Flecha abajo: subir o bajar la cuerda "
-            "seleccionada según el tamaño elegido en \"Ajuste manual de una cuerda\".",
-            "Ctrl+Mayús+R: restablecer únicamente el ajuste manual de la cuerda seleccionada.",
-            "Ctrl+Mayús+Z: deshacer el último retoque en cuartos de tono.",
-            "Ctrl+Mayús+P: reproducir la afinación completa, todas las cuerdas seguidas.",
-            "Ctrl+Mayús+V: repetir la última instrucción de afinación anunciada.",
-        ]
+        """Lista los atajos configurables (con su tecla actual) y los fijos, que no
+        se pueden reasignar: se despachan por su propio manejador de teclado
+        (F1, Ctrl+1/2/3) o son convenciones de toda la app (tecla Menú/Mayús+F10)."""
+        atajos = cargar_atajos()
+        lineas = ["{}: {}".format(texto_atajo(entrada), entrada["descripcion"]) for entrada in atajos.values()]
+        lineas.append("")
+        lineas.append("Fijos (no se pueden reasignar):")
+        lineas.append("F1: abrir la ayuda local.")
+        lineas.append("Ctrl+1, Ctrl+2, Ctrl+3: abrir Afinar, Afinaciones especiales o Audio y ajustes.")
+        lineas.append("Tecla Menú / Mayús+F10: abrir este menú contextual.")
         wx.MessageBox("\n".join(lineas), "Atajos de teclado actuales", wx.OK | wx.ICON_INFORMATION)
 
     def _al_visitar_tiflotutos(self, evento):
