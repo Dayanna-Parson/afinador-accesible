@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+afinador.log
+motor_rust/target/
+*.so
+*.pyd
+configuraciones/
