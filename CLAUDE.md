@@ -39,7 +39,7 @@ Anclajes existentes:
 | `capturador_yin` | `app/motor_audio.py` |
 | `generador_tonos` | `app/motor_audio.py` |
 | `api_nvda` | `app/conector_nvda.py` |
-| `ventana_principal` | `app/interfaz_gui.py` |
+| `ventana_principal` | `app/interfaz/ventana_principal.py` |
 
 ### Cambios quirúrgicos
 Nunca reescribas un archivo completo si solo hay que modificar un bloque. Entrega únicamente el bloque ANCLAJE afectado y el contexto mínimo necesario para ubicarlo. Menos tokens, menos riesgo de romper lo que ya funciona.
@@ -66,7 +66,7 @@ No añadas dependencias sin justificación explícita. Cada librería nueva es u
 - Si el módulo compilado `motor_rust` está instalado en el entorno, delega en `motor_rust.CapturadorYinRust` (captura con `cpal`, YIN en Rust). Se prefiere por su menor latencia y acceso más directo al dispositivo (WASAPI en Windows), evitando imprecisiones conocidas de `sounddevice`/PortAudio con interfaces externas.
 - Si no está instalado, recae de forma transparente en `_CapturadorYINPuroPython` (implementación 100% Python con `sounddevice`), con la misma interfaz pública (`iniciar`, `detener`, `pausar`, `reanudar`).
 
-**Nunca** debe romperse esta compatibilidad de interfaz: cualquier cambio en un backend tiene que reflejarse en el otro, o al menos no cambiar la forma en que `interfaz_gui.py` los consume. La conversión de frecuencia a nota (`frecuencia_a_nota`), el cálculo de instrucción de afinación (`calcular_instruccion`) y toda la lógica de UI/NVDA se quedan siempre en Python — Rust solo se encarga de la captura y el DSP en tiempo real.
+**Nunca** debe romperse esta compatibilidad de interfaz: cualquier cambio en un backend tiene que reflejarse en el otro, o al menos no cambiar la forma en que `app/interfaz/ventana_principal.py` los consume. La conversión de frecuencia a nota (`frecuencia_a_nota`), el cálculo de instrucción de afinación (`calcular_instruccion`) y toda la lógica de UI/NVDA se quedan siempre en Python — Rust solo se encarga de la captura y el DSP en tiempo real.
 
 La extensión Rust se compila con `maturin` (ver `motor_rust/pyproject.toml` y el README). El binario compilado (`.pyd`/`.so`) nunca se commitea; cada máquina lo compila una vez.
 
@@ -79,7 +79,12 @@ app/
 ├── motor_audio.py     # CapturadorYIN (despachador Rust/Python), _CapturadorYINPuroPython
 │                       # (respaldo), YIN en Python puro, GeneradorTonos, conversión nota↔frecuencia
 ├── conector_nvda.py    # AnunciadorNVDA: accessible_output3 + throttling por estabilidad (350 ms)
-├── interfaz_gui.py     # VentanaPrincipal: wx.Frame raíz, presets de instrumento, flujo de captura
+├── interfaz_gui.py     # Compatibilidad temporal: reexporta VentanaPrincipal desde interfaz/
+├── interfaz/
+│   └── ventana_principal.py  # VentanaPrincipal: wx.Frame raíz, pestañas, flujo de captura
+├── presets_instrumento.py  # PRESETS_INSTRUMENTO, ESCALAS_POR_INSTRUMENTO (sin wx, para pruebas)
+├── afinaciones_maqam_lira.py  # Catálogo de maqamat de la lira, sin wx
+├── perfiles_afinacion.py  # Perfiles de afinación guardados por instrumento
 ├── gestor_ajustes.py    # cargar_ajustes()/guardar_ajustes(): persistencia atómica en
 │                        # configuraciones/ajustes.json
 ├── control_microfono.py # asegurar_microfono_activo(): desmute opcional a nivel de
@@ -102,7 +107,7 @@ INSTALAR_AFINADOR.bat       # Instalador de dependencias y compilación opcional
 
 ## Instrumentos y afinaciones estándar
 
-Los presets viven en `PRESETS_INSTRUMENTO` (`app/interfaz_gui.py`), como listas de `(nombre_cuerda, indice_nota, octava)`. `indice_nota` usa `NOMBRES_NOTAS` de `motor_audio.py` (0=Do, 1=Do#, 2=Re, 3=Re#, 4=Mi, 5=Fa, 6=Fa#, 7=Sol, 8=Sol#, 9=La, 10=La#, 11=Si). La octava sigue la notación científica con La4=440 Hz como referencia.
+Los presets viven en `PRESETS_INSTRUMENTO` (`app/presets_instrumento.py`), como listas de `(nombre_cuerda, indice_nota, octava)`. `indice_nota` usa `NOMBRES_NOTAS` de `motor_audio.py` (0=Do, 1=Do#, 2=Re, 3=Re#, 4=Mi, 5=Fa, 6=Fa#, 7=Sol, 8=Sol#, 9=La, 10=La#, 11=Si). La octava sigue la notación científica con La4=440 Hz como referencia.
 
 | Instrumento | Afinación |
 |---|---|
@@ -125,7 +130,7 @@ pasan siempre por `_frecuencia_objetivo_actual()`, que lee ese mismo desplazamie
 dupliques el cálculo de frecuencia objetivo en un sitio nuevo sin pasar por ahí, o divergirán
 entre lo que suena y lo que se compara.
 
-`ESCALAS_POR_INSTRUMENTO` (`app/interfaz_gui.py`) define, por instrumento, diccionarios de
+`ESCALAS_POR_INSTRUMENTO` (`app/presets_instrumento.py`) define, por instrumento, diccionarios de
 `nombre_cuerda → cuartos_tono` que se aplican de golpe sobre `ajustes_finos_cuerdas` al
 cambiar el selector "Escala / afinación" (`_al_cambiar_escala`): incluye los maqams árabes
 de la lira (Rast, Bayati, Hijaz, verificados contra Touma, "The Music of the Arabs") y
@@ -180,7 +185,7 @@ Los portátiles con reducción de ruido inteligente en el micrófono (Lenovo Van
 
 ### Atajos de teclado: nunca la tecla Espacio
 Todos declarados en una única `wx.AcceleratorTable` a nivel de `wx.Frame`
-(`VentanaPrincipal._construir_atajos`, `app/interfaz_gui.py`):
+(`VentanaPrincipal._construir_atajos`, `app/interfaz/ventana_principal.py`):
 
 | Atajo | Acción |
 |---|---|

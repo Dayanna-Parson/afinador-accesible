@@ -3,7 +3,7 @@
 import math
 import unittest
 
-from app.interfaz.ventana_principal import (
+from app.presets_instrumento import (
     ESCALAS_POR_INSTRUMENTO,
     NOMBRE_GUITARRA,
     NOMBRE_LIRA,

@@ -28,11 +28,19 @@ from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
 from app.perfiles_afinacion import guardar_perfil, migrar_perfiles, nombres_perfiles
 from app.config_rutas import RUTA_AYUDA
 from app.afinaciones_maqam_lira import (
-    AFINACIONES_LIRA_MAQAM_24EDO,
     FAMILIAS_MAQAM_LIRA,
     NOMBRE_AFINACION_FABRICA_LIRA,
     NOMBRE_AFINACION_PERSONALIZADA_LIRA,
     REFERENCIAS_GRADOS_MAQAM_24EDO,
+)
+from app.presets_instrumento import (
+    CROMATICO,
+    ESCALAS_POR_INSTRUMENTO,
+    NOMBRE_AFINACION_PERSONALIZADA,
+    NOMBRE_GUITARRA,
+    NOMBRE_LIRA,
+    NOMBRE_UKELELE,
+    PRESETS_INSTRUMENTO,
 )
 from app.interfaz.ui_recursos import aplicar_icono_boton
 
@@ -51,51 +59,6 @@ NOMBRES_NOTAS_SOSTENIDOS = ["Do", "Do sostenido", "Re", "Re sostenido", "Mi", "F
 NOMBRES_NOTAS_AMERICANOS = ["C", "C sostenido", "D", "D sostenido", "E", "F", "F sostenido", "G", "G sostenido", "A", "A sostenido", "B"]
 
 # índice de nota cromática: 0=Do, 1=Do#, 2=Re, 3=Re#, 4=Mi, 5=Fa, 6=Fa#, 7=Sol, 8=Sol#, 9=La, 10=La#, 11=Si
-CROMATICO = "Cromático (cualquier nota)"
-
-PRESETS_INSTRUMENTO = {
-    CROMATICO: None,
-    "Lira de 16 cuerdas (Aklot)": [
-        ("Cuerda 1 (Sol)", 7, 3), ("Cuerda 2 (La)", 9, 3), ("Cuerda 3 (Si)", 11, 3), ("Cuerda 4 (Do)", 0, 4),
-        ("Cuerda 5 (Re)", 2, 4), ("Cuerda 6 (Mi)", 4, 4), ("Cuerda 7 (Fa)", 5, 4), ("Cuerda 8 (Sol)", 7, 4),
-        ("Cuerda 9 (La)", 9, 4), ("Cuerda 10 (Si)", 11, 4), ("Cuerda 11 (Do)", 0, 5), ("Cuerda 12 (Re)", 2, 5),
-        ("Cuerda 13 (Mi)", 4, 5), ("Cuerda 14 (Fa)", 5, 5), ("Cuerda 15 (Sol)", 7, 5), ("Cuerda 16 (La)", 9, 5),
-    ],
-    "Ukelele": [
-        ("Cuerda 1 (Sol)", 7, 4), ("Cuerda 2 (Do)", 0, 4),
-        ("Cuerda 3 (Mi)", 4, 4), ("Cuerda 4 (La)", 9, 4),
-    ],
-    "Guitarra": [
-        ("Cuerda 6 (Mi)", 4, 2), ("Cuerda 5 (La)", 9, 2), ("Cuerda 4 (Re)", 2, 3),
-        ("Cuerda 3 (Sol)", 7, 3), ("Cuerda 2 (Si)", 11, 3), ("Cuerda 1 (Mi)", 4, 4),
-    ],
-}
-
-NOMBRE_LIRA = "Lira de 16 cuerdas (Aklot)"
-NOMBRE_GUITARRA = "Guitarra"
-NOMBRE_UKELELE = "Ukelele"
-NOMBRE_AFINACION_PERSONALIZADA = "Personalizada (retoques manuales)"
-
-# Guitarra y ukelele: afinaciones alternativas estándar, ampliamente documentadas. En un
-# instrumento con trastes el retoque solo desplaza la cuerda al aire entera — los trastes
-# siguen fijos en semitonos occidentales, así que estas afinaciones no dan acceso a cuartos
-# de tono nuevos en el mástil, solo a otras disposiciones de acordes/resonancias.
-ESCALAS_POR_INSTRUMENTO = {
-    NOMBRE_LIRA: dict(AFINACIONES_LIRA_MAQAM_24EDO),
-    NOMBRE_GUITARRA: {
-        "Estándar (Mi La Re Sol Si Mi)": {},
-        "Drop D (Re La Re Sol Si Mi)": {"Cuerda 6 (Mi)": -4},
-        "Open G (Re Sol Re Sol Si Re)": {"Cuerda 6 (Mi)": -4, "Cuerda 5 (La)": -4, "Cuerda 1 (Mi)": -4},
-        "Open D (Re La Re Fa# La Re)": {
-            "Cuerda 6 (Mi)": -4, "Cuerda 3 (Sol)": -2, "Cuerda 2 (Si)": -4, "Cuerda 1 (Mi)": -4,
-        },
-        "DADGAD (Re La Re Sol La Re)": {"Cuerda 6 (Mi)": -4, "Cuerda 2 (Si)": -4, "Cuerda 1 (Mi)": -4},
-    },
-    NOMBRE_UKELELE: {
-        "Estándar (Sol Do Mi La, reentrante)": {},
-    },
-}
-
 OPCIONES_TASA_MUESTREO = [
     ("Automática (recomendada)", None),
     ("44100 Hz", 44100),
@@ -189,11 +152,15 @@ class VentanaPrincipal(wx.Frame):
 
         # Afinar: lo necesario para una sesión corriente.
         self.selector_instrumento = wx.RadioBox(
-            self.pagina_afinar, label="Instrumento que quieres afinar", choices=[NOMBRE_LIRA, NOMBRE_GUITARRA, NOMBRE_UKELELE],
+            self.pagina_afinar, label="Instrumento que quieres afinar",
+            choices=[CROMATICO, NOMBRE_LIRA, NOMBRE_GUITARRA, NOMBRE_UKELELE],
             majorDimension=1, style=wx.RA_SPECIFY_ROWS,
         )
-        self.selector_instrumento.SetSelection(0)
-        self.selector_instrumento.SetHelpText("Tus tres instrumentos. Al abrir cada uno parte de su afinación estándar.")
+        self.selector_instrumento.SetStringSelection(NOMBRE_LIRA)
+        self.selector_instrumento.SetHelpText(
+            "Tus tres instrumentos, más el modo cromático para cualquier nota suelta. "
+            "Al abrir cada uno parte de su afinación estándar."
+        )
         # RadioBox emite EVT_RADIOBOX, no EVT_CHOICE. Usar el evento correcto es
         # esencial: de lo contrario puede quedarse visible la lista de cuerdas
         # del instrumento anterior.
