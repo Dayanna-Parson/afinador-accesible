@@ -191,8 +191,9 @@ class PruebasMezcladoAMonoMulticanal(unittest.TestCase):
         indata = np.stack([ruido, tono], axis=1).astype(np.float32)
         capturador._callback_audio(indata, len(indata), None, None)
 
-        mono = capturador._cola.get_nowait()
+        mono, mono_alterno = capturador._cola.get_nowait()
         np.testing.assert_allclose(mono, indata[:, 1], atol=1e-6)
+        np.testing.assert_allclose(mono_alterno, indata.mean(axis=1), atol=1e-6)
 
         frecuencia = estimar_frecuencia_yin(mono, tasa_muestreo)
         self.assertIsNotNone(frecuencia)
@@ -204,8 +205,31 @@ class PruebasMezcladoAMonoMulticanal(unittest.TestCase):
         indata[:, 0] = 0.5
         capturador._callback_audio(indata, len(indata), None, None)
 
-        mono = capturador._cola.get_nowait()
+        mono, mono_alterno = capturador._cola.get_nowait()
         np.testing.assert_allclose(mono, indata[:, 0])
+        self.assertIsNone(mono_alterno)
+
+    def test_reintenta_con_canales_promediados_si_el_canal_elegido_no_basta(self):
+        tasa_muestreo = TASA_MUESTREO_PRUEBA
+        tono = generar_cuerda_pulsada(220.0, 0.1, tasa_muestreo=tasa_muestreo, semilla=5)
+        generador_aleatorio = np.random.default_rng(2)
+        # Simula un micrófono de array real: los dos canales llevan la misma cuerda pero
+        # cada uno con su propio ruido independiente, demasiado bajo por separado para
+        # que YIN encuentre el tono; al promediarlos el ruido no correlacionado se atenúa
+        # y la periodicidad de la cuerda (correlacionada entre ambos) queda por encima
+        # del umbral.
+        canal_a = tono * 0.9 + generador_aleatorio.normal(0, 0.2, len(tono))
+        canal_b = tono * 0.9 + generador_aleatorio.normal(0, 0.2, len(tono))
+
+        capturador = self._capturador_sin_dispositivo_real()
+        indata = np.stack([canal_a, canal_b], axis=1).astype(np.float32)
+        capturador._callback_audio(indata, len(indata), None, None)
+        mono, mono_alterno = capturador._cola.get_nowait()
+
+        self.assertIsNone(estimar_frecuencia_yin(mono, tasa_muestreo))
+        frecuencia_promedio = estimar_frecuencia_yin(mono_alterno, tasa_muestreo)
+        self.assertIsNotNone(frecuencia_promedio)
+        self.assertAlmostEqual(frecuencia_promedio, 220.0, delta=3.0)
 
 
 if __name__ == "__main__":

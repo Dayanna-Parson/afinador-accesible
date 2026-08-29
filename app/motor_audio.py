@@ -244,6 +244,7 @@ class _CapturadorYINPuroPython:
             logger.warning("estado del flujo de entrada de audio: %s", estado)
         if self._pausado.is_set():
             return
+        mono_alterno = None
         if self.canal_entrada is not None:
             mono = indata[:, self.canal_entrada]
         elif indata.shape[1] > 1:
@@ -252,12 +253,19 @@ class _CapturadorYINPuroPython:
             # de la misma fuente. Promediarlos a ciegas mezcla la señal periódica de la
             # cuerda con el ruido no correlacionado del resto de canales y destruye la
             # periodicidad que el YIN necesita para encontrar el tono, aunque el nivel
-            # general (rms) del canal mezclado siga moviéndose con cada pulsación. En su
-            # lugar, cada bloque se queda con el canal de mayor energía: normalmente es el
-            # único que lleva señal útil, y los demás aportan solo ruido de fondo.
+            # general (rms) del canal mezclado siga moviéndose con cada pulsación. Por eso
+            # cada bloque se queda primero con el canal de mayor energía: normalmente es el
+            # único que lleva señal útil, y los demás aportan solo ruido de fondo. Pero en
+            # modo exclusivo WASAPI, un dispositivo de array real (varios micrófonos físicos
+            # muy próximos) puede repartir la señal en dos canales de energía parecida, cada
+            # uno con demasiado poco nivel por separado para que el YIN encuentre el tono;
+            # ahí sí conviene promediarlos, porque las dos capturan la misma cuerda casi en
+            # fase y sumar mejora la relación señal/ruido en vez de destruirla. Se guarda
+            # también ese promedio como alternativa, por si el canal elegido no basta.
             energia_por_canal = np.sqrt(np.mean(indata.astype(np.float64) ** 2, axis=0))
             canal_elegido = int(np.argmax(energia_por_canal))
             mono = indata[:, canal_elegido]
+            mono_alterno = indata.mean(axis=1)
             ahora = time.monotonic()
             if ahora - self._ultimo_log_canales >= 2.0:
                 self._ultimo_log_canales = ahora
@@ -269,22 +277,25 @@ class _CapturadorYINPuroPython:
             mono = indata[:, 0]
         if self.ganancia != 1.0:
             mono = np.clip(mono * self.ganancia, -1.0, 1.0)
+            if mono_alterno is not None:
+                mono_alterno = np.clip(mono_alterno * self.ganancia, -1.0, 1.0)
+        bloque = (mono.copy(), mono_alterno.copy() if mono_alterno is not None else None)
         try:
-            self._cola.put_nowait(mono.copy())
+            self._cola.put_nowait(bloque)
         except queue.Full:
             try:
                 self._cola.get_nowait()
             except queue.Empty:
                 pass
             try:
-                self._cola.put_nowait(mono.copy())
+                self._cola.put_nowait(bloque)
             except queue.Full:
                 pass
 
     def _bucle_analisis(self):
         while not self._detener.is_set():
             try:
-                bloque = self._cola.get(timeout=0.2)
+                bloque, bloque_alterno = self._cola.get(timeout=0.2)
             except queue.Empty:
                 continue
             rms = float(np.sqrt(np.mean(bloque ** 2)))
@@ -297,6 +308,18 @@ class _CapturadorYINPuroPython:
             except Exception:
                 logger.exception("fallo al estimar la frecuencia con YIN")
                 frecuencia = None
+            if frecuencia is None and bloque_alterno is not None:
+                # El canal de mayor energía no bastó: puede ser un dispositivo de array
+                # real cuya señal se reparte entre canales (ver _callback_audio). Se
+                # reintenta con el promedio de todos los canales antes de dar el bloque
+                # por silencioso.
+                try:
+                    frecuencia = estimar_frecuencia_yin(bloque_alterno, self.tasa_muestreo, umbral=self.umbral_yin)
+                except Exception:
+                    logger.exception("fallo al estimar la frecuencia con YIN (canal promediado)")
+                    frecuencia = None
+                if frecuencia is not None:
+                    logger.info("nota recuperada promediando canales tras fallar el canal elegido")
             resultado = frecuencia_a_nota(frecuencia) if frecuencia else None
             if resultado is None:
                 ahora = time.monotonic()
