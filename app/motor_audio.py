@@ -244,8 +244,19 @@ class _CapturadorYINPuroPython:
             return
         if self.canal_entrada is not None:
             mono = indata[:, self.canal_entrada]
+        elif indata.shape[1] > 1:
+            # "Varios micrófonos" y otros dispositivos compuestos de Windows combinan
+            # elementos de array independientes en canales separados, no un estéreo real
+            # de la misma fuente. Promediarlos a ciegas mezcla la señal periódica de la
+            # cuerda con el ruido no correlacionado del resto de canales y destruye la
+            # periodicidad que el YIN necesita para encontrar el tono, aunque el nivel
+            # general (rms) del canal mezclado siga moviéndose con cada pulsación. En su
+            # lugar, cada bloque se queda con el canal de mayor energía: normalmente es el
+            # único que lleva señal útil, y los demás aportan solo ruido de fondo.
+            energia_por_canal = np.sqrt(np.mean(indata.astype(np.float64) ** 2, axis=0))
+            mono = indata[:, int(np.argmax(energia_por_canal))]
         else:
-            mono = indata.mean(axis=1) if indata.shape[1] > 1 else indata[:, 0]
+            mono = indata[:, 0]
         if self.ganancia != 1.0:
             mono = np.clip(mono * self.ganancia, -1.0, 1.0)
         try:

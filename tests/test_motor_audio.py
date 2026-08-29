@@ -11,6 +11,7 @@ import unittest
 import numpy as np
 
 from app.motor_audio import (
+    _CapturadorYINPuroPython,
     calcular_instruccion,
     estimar_frecuencia_yin,
     frecuencia_a_nota,
@@ -162,6 +163,47 @@ class PruebasCoordinacionDeReproduccion(unittest.TestCase):
 
         generador._finalizar_reproduccion(identificador_actual)
         self.assertEqual(capturador.reanudaciones, 1)
+
+
+class PruebasMezcladoAMonoMulticanal(unittest.TestCase):
+    """Comprueba que un dispositivo compuesto de varios canales (p. ej. "Varios
+    micrófonos" de Windows) no promedia a ciegas la señal útil con el ruido de
+    canales sin voz/instrumento: eso destruye la periodicidad que el YIN necesita
+    para encontrar el tono, aunque el nivel general del canal mezclado siga
+    moviéndose con cada pulsación."""
+
+    def _capturador_sin_dispositivo_real(self):
+        capturador = _CapturadorYINPuroPython.__new__(_CapturadorYINPuroPython)
+        capturador.canal_entrada = None
+        capturador.ganancia = 1.0
+        capturador._pausado = type("_", (), {"is_set": staticmethod(lambda: False)})()
+        capturador._cola = __import__("queue").Queue(maxsize=2)
+        return capturador
+
+    def test_elige_el_canal_con_mas_energia_en_vez_de_promediar(self):
+        tasa_muestreo = TASA_MUESTREO_PRUEBA
+        tono = generar_cuerda_pulsada(220.0, 0.1, tasa_muestreo=tasa_muestreo)
+        ruido = np.random.default_rng(1).normal(0.0, 0.05, size=tono.shape)
+
+        capturador = self._capturador_sin_dispositivo_real()
+        indata = np.stack([ruido, tono], axis=1).astype(np.float32)
+        capturador._callback_audio(indata, len(indata), None, None)
+
+        mono = capturador._cola.get_nowait()
+        np.testing.assert_allclose(mono, indata[:, 1], atol=1e-6)
+
+        frecuencia = estimar_frecuencia_yin(mono, tasa_muestreo)
+        self.assertIsNotNone(frecuencia)
+        self.assertAlmostEqual(frecuencia, 220.0, delta=3.0)
+
+    def test_un_solo_canal_no_pasa_por_la_seleccion(self):
+        capturador = self._capturador_sin_dispositivo_real()
+        indata = np.zeros((1024, 1), dtype=np.float32)
+        indata[:, 0] = 0.5
+        capturador._callback_audio(indata, len(indata), None, None)
+
+        mono = capturador._cola.get_nowait()
+        np.testing.assert_allclose(mono, indata[:, 0])
 
 
 if __name__ == "__main__":

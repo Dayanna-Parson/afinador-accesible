@@ -26,6 +26,31 @@ fn calcular_rms(muestras: &[f32]) -> f32 {
     (suma_cuadrados / muestras.len() as f32).sqrt()
 }
 
+/// Elige, dentro de un bloque de audio entrelazado, el canal con más energía.
+///
+/// "Varios micrófonos" y otros dispositivos compuestos de Windows combinan elementos
+/// de array independientes en canales separados, no un estéreo real de la misma fuente.
+/// Promediarlos a ciegas mezcla la señal periódica de la cuerda con el ruido no
+/// correlacionado del resto de canales y destruye la periodicidad que el YIN necesita
+/// para encontrar el tono, aunque el nivel general del canal mezclado siga moviéndose
+/// con cada pulsación. Quedarse con el canal de mayor energía por bloque evita ese
+/// problema: normalmente es el único que lleva señal útil.
+fn canal_de_mayor_energia<S: Copy>(datos: &[S], canales: usize, a_f32: impl Fn(S) -> f32) -> usize {
+    let mut energia = vec![0f64; canales];
+    for marco in datos.chunks(canales) {
+        for (indice, muestra) in marco.iter().enumerate() {
+            let valor = a_f32(*muestra) as f64;
+            energia[indice] += valor * valor;
+        }
+    }
+    energia
+        .iter()
+        .enumerate()
+        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+        .map(|(indice, _)| indice)
+        .unwrap_or(0)
+}
+
 /// Estima la frecuencia fundamental de una señal mono mediante el algoritmo YIN.
 fn estimar_frecuencia_yin(senal: &[f32], tasa_muestreo: f32, umbral: f32, f_min: f32, f_max: f32) -> Option<f32> {
     let tamano = senal.len();
@@ -234,21 +259,14 @@ impl CapturadorYinRust {
                         if pausado_audio.load(Ordering::Relaxed) {
                             return;
                         }
-                        // Se promedian todos los canales en vez de tomar solo el primero:
-                        // algunos dispositivos compuestos (arrays de varios micrófonos con
-                        // procesamiento propio de Windows) reparten la señal útil entre
-                        // canales, y quedarse solo con el canal 0 puede dejar la captura
-                        // prácticamente muda aunque el dispositivo funcione bien en otras
-                        // aplicaciones.
+                        let indice_elegido = match canal_entrada_audio {
+                            Some(indice) => indice,
+                            None if canales > 1 => canal_de_mayor_energia(datos, canales, |m| m),
+                            None => 0,
+                        };
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| {
-                                let muestra = match canal_entrada_audio {
-                                    Some(indice) => marco[indice],
-                                    None => marco.iter().sum::<f32>() / marco.len() as f32,
-                                };
-                                (muestra * ganancia_audio).clamp(-1.0, 1.0)
-                            })
+                            .map(|marco| (marco[indice_elegido] * ganancia_audio).clamp(-1.0, 1.0))
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
@@ -261,15 +279,14 @@ impl CapturadorYinRust {
                         if pausado_audio.load(Ordering::Relaxed) {
                             return;
                         }
+                        let indice_elegido = match canal_entrada_audio {
+                            Some(indice) => indice,
+                            None if canales > 1 => canal_de_mayor_energia(datos, canales, |m| m.to_float_sample()),
+                            None => 0,
+                        };
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| {
-                                let muestra = match canal_entrada_audio {
-                                    Some(indice) => marco[indice].to_float_sample(),
-                                    None => marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32,
-                                };
-                                (muestra * ganancia_audio).clamp(-1.0, 1.0)
-                            })
+                            .map(|marco| (marco[indice_elegido].to_float_sample() * ganancia_audio).clamp(-1.0, 1.0))
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
@@ -282,15 +299,14 @@ impl CapturadorYinRust {
                         if pausado_audio.load(Ordering::Relaxed) {
                             return;
                         }
+                        let indice_elegido = match canal_entrada_audio {
+                            Some(indice) => indice,
+                            None if canales > 1 => canal_de_mayor_energia(datos, canales, |m| m.to_float_sample()),
+                            None => 0,
+                        };
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| {
-                                let muestra = match canal_entrada_audio {
-                                    Some(indice) => marco[indice].to_float_sample(),
-                                    None => marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32,
-                                };
-                                (muestra * ganancia_audio).clamp(-1.0, 1.0)
-                            })
+                            .map(|marco| (marco[indice_elegido].to_float_sample() * ganancia_audio).clamp(-1.0, 1.0))
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
@@ -303,15 +319,14 @@ impl CapturadorYinRust {
                         if pausado_audio.load(Ordering::Relaxed) {
                             return;
                         }
+                        let indice_elegido = match canal_entrada_audio {
+                            Some(indice) => indice,
+                            None if canales > 1 => canal_de_mayor_energia(datos, canales, |m| m.to_float_sample()),
+                            None => 0,
+                        };
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| {
-                                let muestra = match canal_entrada_audio {
-                                    Some(indice) => marco[indice].to_float_sample(),
-                                    None => marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32,
-                                };
-                                (muestra * ganancia_audio).clamp(-1.0, 1.0)
-                            })
+                            .map(|marco| (marco[indice_elegido].to_float_sample() * ganancia_audio).clamp(-1.0, 1.0))
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
@@ -324,15 +339,14 @@ impl CapturadorYinRust {
                         if pausado_audio.load(Ordering::Relaxed) {
                             return;
                         }
+                        let indice_elegido = match canal_entrada_audio {
+                            Some(indice) => indice,
+                            None if canales > 1 => canal_de_mayor_energia(datos, canales, |m| m.to_float_sample()),
+                            None => 0,
+                        };
                         let mono: Vec<f32> = datos
                             .chunks(canales)
-                            .map(|marco| {
-                                let muestra = match canal_entrada_audio {
-                                    Some(indice) => marco[indice].to_float_sample(),
-                                    None => marco.iter().map(|m| m.to_float_sample()).sum::<f32>() / marco.len() as f32,
-                                };
-                                (muestra * ganancia_audio).clamp(-1.0, 1.0)
-                            })
+                            .map(|marco| (marco[indice_elegido].to_float_sample() * ganancia_audio).clamp(-1.0, 1.0))
                             .collect();
                         let _ = tx_muestras.try_send(mono);
                     },
