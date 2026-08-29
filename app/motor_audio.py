@@ -210,6 +210,8 @@ class _CapturadorYINPuroPython:
         self.canal_entrada = canal_entrada
 
         self._flujo = None
+        self._ultimo_log_canales = 0.0
+        self._ultimo_log_sin_nota = 0.0
         self._cola = queue.Queue(maxsize=2)
         self._hilo_analisis = None
         self._detener = threading.Event()
@@ -254,7 +256,15 @@ class _CapturadorYINPuroPython:
             # lugar, cada bloque se queda con el canal de mayor energía: normalmente es el
             # único que lleva señal útil, y los demás aportan solo ruido de fondo.
             energia_por_canal = np.sqrt(np.mean(indata.astype(np.float64) ** 2, axis=0))
-            mono = indata[:, int(np.argmax(energia_por_canal))]
+            canal_elegido = int(np.argmax(energia_por_canal))
+            mono = indata[:, canal_elegido]
+            ahora = time.monotonic()
+            if ahora - self._ultimo_log_canales >= 2.0:
+                self._ultimo_log_canales = ahora
+                logger.info(
+                    "canal elegido=%s energia_por_canal=%s",
+                    canal_elegido, np.round(energia_por_canal, 5).tolist(),
+                )
         else:
             mono = indata[:, 0]
         if self.ganancia != 1.0:
@@ -288,6 +298,15 @@ class _CapturadorYINPuroPython:
                 logger.exception("fallo al estimar la frecuencia con YIN")
                 frecuencia = None
             resultado = frecuencia_a_nota(frecuencia) if frecuencia else None
+            if resultado is None:
+                ahora = time.monotonic()
+                if ahora - self._ultimo_log_sin_nota >= 2.0:
+                    self._ultimo_log_sin_nota = ahora
+                    logger.info(
+                        "señal presente (rms=%.4f) pero YIN no encontró candidato "
+                        "por debajo del umbral_yin=%.2f",
+                        rms, self.umbral_yin,
+                    )
             if self.al_detectar:
                 self.al_detectar(resultado, rms)
 

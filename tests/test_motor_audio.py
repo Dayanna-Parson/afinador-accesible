@@ -176,6 +176,8 @@ class PruebasMezcladoAMonoMulticanal(unittest.TestCase):
         capturador = _CapturadorYINPuroPython.__new__(_CapturadorYINPuroPython)
         capturador.canal_entrada = None
         capturador.ganancia = 1.0
+        capturador._ultimo_log_canales = 0.0
+        capturador._ultimo_log_sin_nota = 0.0
         capturador._pausado = type("_", (), {"is_set": staticmethod(lambda: False)})()
         capturador._cola = __import__("queue").Queue(maxsize=2)
         return capturador
