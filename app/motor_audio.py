@@ -359,6 +359,7 @@ class _CapturadorYINPuroPython:
                 self._flujo = sd.InputStream(extra_settings=ajustes_exclusivos_wasapi, **argumentos_flujo)
                 self._flujo.start()
                 logger.info("Captura abierta en modo exclusivo WASAPI (sin procesamiento de Windows)")
+                self._ajustar_tasa_muestreo_real()
                 return
             except Exception:
                 logger.warning(
@@ -370,6 +371,25 @@ class _CapturadorYINPuroPython:
 
         self._flujo = sd.InputStream(**argumentos_flujo)
         self._flujo.start()
+        self._ajustar_tasa_muestreo_real()
+
+    def _ajustar_tasa_muestreo_real(self):
+        """En modo exclusivo WASAPI el dispositivo puede aceptar la apertura sin lanzar
+        ningún error y aun así entregar el audio a una tasa de muestreo distinta de la
+        pedida (el hardware solo admite su formato nativo fijo). Si el YIN sigue
+        calculando con la tasa que se pidió en vez de la que realmente está llegando,
+        cada bloque de audio real acaba comparado contra una ventana de tiempo
+        equivocada y la periodicidad de la cuerda nunca coincide con ningún candidato,
+        aunque la señal (rms) se vea perfectamente viva. Se corrige leyendo la tasa que
+        el propio flujo confirma tras abrirse."""
+        tasa_real = getattr(self._flujo, "samplerate", None)
+        if tasa_real and abs(tasa_real - self.tasa_muestreo) > 1:
+            logger.warning(
+                "la tasa de muestreo real del flujo (%s Hz) no coincide con la pedida (%s Hz); "
+                "se usa la real para la detección de tono",
+                tasa_real, self.tasa_muestreo,
+            )
+            self.tasa_muestreo = float(tasa_real)
 
     @staticmethod
     def _ajustes_exclusivos_wasapi():
