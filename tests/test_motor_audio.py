@@ -172,10 +172,11 @@ class PruebasMezcladoAMonoMulticanal(unittest.TestCase):
     para encontrar el tono, aunque el nivel general del canal mezclado siga
     moviéndose con cada pulsación."""
 
-    def _capturador_sin_dispositivo_real(self):
+    def _capturador_sin_dispositivo_real(self, preferir_exclusivo_wasapi=False):
         capturador = _CapturadorYINPuroPython.__new__(_CapturadorYINPuroPython)
         capturador.canal_entrada = None
         capturador.ganancia = 1.0
+        capturador.preferir_exclusivo_wasapi = preferir_exclusivo_wasapi
         capturador._ultimo_log_canales = 0.0
         capturador._ultimo_log_sin_nota = 0.0
         capturador._pausado = type("_", (), {"is_set": staticmethod(lambda: False)})()
@@ -230,6 +231,38 @@ class PruebasMezcladoAMonoMulticanal(unittest.TestCase):
         frecuencia_promedio = estimar_frecuencia_yin(mono_alterno, tasa_muestreo)
         self.assertIsNotNone(frecuencia_promedio)
         self.assertAlmostEqual(frecuencia_promedio, 220.0, delta=3.0)
+
+    def _capturador_para_bucle_analisis(self, preferir_exclusivo_wasapi):
+        capturador = self._capturador_sin_dispositivo_real(preferir_exclusivo_wasapi)
+        capturador.tasa_muestreo = TASA_MUESTREO_PRUEBA
+        capturador.umbral_yin = 0.15
+        capturador.umbral_rms = 0.02
+        capturador._detener = type("_", (), {"is_set": staticmethod(lambda: False)})()
+        return capturador
+
+    def test_el_promedio_de_canales_solo_se_usa_en_modo_exclusivo_wasapi(self):
+        tasa_muestreo = TASA_MUESTREO_PRUEBA
+        tono = generar_cuerda_pulsada(220.0, 0.1, tasa_muestreo=tasa_muestreo, semilla=5)
+        generador_aleatorio = np.random.default_rng(2)
+        canal_a = tono * 0.9 + generador_aleatorio.normal(0, 0.2, len(tono))
+        canal_b = tono * 0.9 + generador_aleatorio.normal(0, 0.2, len(tono))
+
+        resultados = []
+        capturador = self._capturador_para_bucle_analisis(preferir_exclusivo_wasapi=False)
+        capturador.al_detectar = lambda resultado, rms: resultados.append(resultado)
+        capturador._detener = type("_", (), {"is_set": staticmethod(lambda: len(resultados) >= 1)})()
+        promedio = ((canal_a + canal_b) / 2).astype(np.float32)
+        capturador._cola.put_nowait((canal_a.astype(np.float32), promedio))
+        capturador._bucle_analisis()
+        self.assertIsNone(resultados[-1], "en modo compartido no debe recuperar nota promediando canales")
+
+        resultados_exclusivo = []
+        capturador_exclusivo = self._capturador_para_bucle_analisis(preferir_exclusivo_wasapi=True)
+        capturador_exclusivo.al_detectar = lambda resultado, rms: resultados_exclusivo.append(resultado)
+        capturador_exclusivo._detener = type("_", (), {"is_set": staticmethod(lambda: len(resultados_exclusivo) >= 1)})()
+        capturador_exclusivo._cola.put_nowait((canal_a.astype(np.float32), promedio))
+        capturador_exclusivo._bucle_analisis()
+        self.assertIsNotNone(resultados_exclusivo[-1], "en modo exclusivo WASAPI sí debe recuperar la nota promediando canales")
 
 
 if __name__ == "__main__":

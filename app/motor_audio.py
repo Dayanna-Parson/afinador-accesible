@@ -308,11 +308,17 @@ class _CapturadorYINPuroPython:
             except Exception:
                 logger.exception("fallo al estimar la frecuencia con YIN")
                 frecuencia = None
-            if frecuencia is None and bloque_alterno is not None:
+            if frecuencia is None and bloque_alterno is not None and self.preferir_exclusivo_wasapi:
                 # El canal de mayor energía no bastó: puede ser un dispositivo de array
                 # real cuya señal se reparte entre canales (ver _callback_audio). Se
                 # reintenta con el promedio de todos los canales antes de dar el bloque
-                # por silencioso.
+                # por silencioso. Solo tiene sentido en modo exclusivo WASAPI, donde el
+                # nivel general es tan bajo que ningún canal por separado basta: en modo
+                # compartido el canal elegido ya tiene energía de sobra, y promediarlo con
+                # un canal débil (ruido, resonancia de otras cuerdas) puede colar una
+                # frecuencia distinta a la real. Esa fue la causa de instrucciones de
+                # afinación erráticas en modo compartido: el promedio recuperaba un tono
+                # espurio en vez de devolver "sin nota" con más frecuencia de la deseada.
                 try:
                     frecuencia = estimar_frecuencia_yin(bloque_alterno, self.tasa_muestreo, umbral=self.umbral_yin)
                 except Exception:
