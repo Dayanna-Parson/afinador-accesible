@@ -24,7 +24,7 @@ from app.motor_audio import (
     listar_dispositivos_entrada,
     nota_a_frecuencia,
 )
-from app.conector_nvda import AnunciadorNVDA
+from app.conector_nvda import SALIDA_LECTOR, SALIDA_VOZ_PROPIA, AnunciadorNVDA
 from app.control_microfono import asegurar_microfono_activo
 from app.gestor_ajustes import cargar_ajustes, guardar_ajustes
 from app.gestor_atajos import (
@@ -144,6 +144,16 @@ SEGUNDOS_ESPERA_DIAGNOSTICO_SENAL = 4.0
 SEGUNDOS_ESTABLE_PARA_AVANZAR = 1.2
 SEGUNDOS_MARGEN_SILENCIO_ENTRE_NOTAS = 0.5
 TAMANO_HISTORIAL_FRECUENCIAS = 5
+# Tras un tono de referencia, la reverberación de la habitación sigue llegando al
+# micrófono unas décimas de segundo, con la misma frecuencia que la cuerda objetivo:
+# sin este margen podía dar por afinada una cuerda que en realidad no ha sonado.
+SEGUNDOS_MARGEN_TRAS_TONO = 0.4
+INTERVALO_MS_ESPERA_FIN_HABLA = 100
+INTENTOS_MAXIMOS_ESPERA_FIN_HABLA = 100
+OPCIONES_SALIDA_VOZ = [
+    ("Lector de pantalla (NVDA, JAWS o Narrador)", SALIDA_LECTOR),
+    ("Voz propia del afinador (SAPI5, independiente del lector)", SALIDA_VOZ_PROPIA),
+]
 
 
 # ANCLAJE_INICIO: DIALOGO_CAPTURA_TECLA
@@ -383,6 +393,7 @@ class VentanaPrincipal(wx.Frame):
         self._ultima_instruccion_afinacion = None
         self._marca_tiempo_ultima_actualizacion = time.monotonic()
         self._aviso_captura_interrumpida = False
+        self._ignorar_microfono_hasta = 0.0
 
         self._construir_controles()
         self._construir_atajos()
@@ -490,6 +501,16 @@ class VentanaPrincipal(wx.Frame):
         )
         self.casilla_modo_solo_escucha.SetValue(False)
         self.casilla_modo_solo_escucha.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
+        self.casilla_modo_distancia = wx.CheckBox(
+            self.pagina_afinar,
+            label="Afinar a distancia (no escucha mientras habla el afinador y reproduce el tono de cada cuerda nueva)",
+        )
+        self.casilla_modo_distancia.SetHelpText(
+            "Para afinar lejos del ordenador con altavoces: evita que la voz se confunda con la cuerda "
+            "y, al avanzar de cuerda, hace sonar su tono de referencia sin tocar el teclado."
+        )
+        self.casilla_modo_distancia.SetValue(False)
+        self.casilla_modo_distancia.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_simple)
         self._organizar_pagina(
             self.pagina_afinar,
             ("Instrumento, afinación y cuerda", (self.selector_instrumento, etiqueta_escala_rapida,
@@ -500,7 +521,7 @@ class VentanaPrincipal(wx.Frame):
                                          self.etiqueta_visual_afinacion, self.indicador_desviacion, etiqueta_escala_visual,
                                          self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia)),
             ("Comportamiento", (self.casilla_avance_automatico, self.casilla_pitido_confirmacion,
-                                 self.casilla_modo_solo_escucha)),
+                                 self.casilla_modo_solo_escucha, self.casilla_modo_distancia)),
         )
 
         # Afinaciones especiales: no distrae de la afinación estándar.
@@ -650,6 +671,32 @@ class VentanaPrincipal(wx.Frame):
         )
         self.selector_nomenclatura.Bind(wx.EVT_RADIOBOX, self._al_cambiar_nomenclatura)
 
+        # ANCLAJE_INICIO: CONTROLES_VOZ_AFINADOR
+        self.selector_salida_voz = wx.RadioBox(
+            self.pagina_audio, label="Quién dice las indicaciones de afinación",
+            choices=[texto for texto, _valor in OPCIONES_SALIDA_VOZ], majorDimension=1, style=wx.RA_SPECIFY_ROWS,
+        )
+        self.selector_salida_voz.SetHelpText(
+            "La voz propia deja el lector de pantalla libre, tiene su propio volumen y velocidad, "
+            "y sabe exactamente cuándo está hablando para no confundirse con la cuerda."
+        )
+        self.selector_salida_voz.Bind(wx.EVT_RADIOBOX, self._al_cambiar_voz_afinador)
+        etiqueta_voz_propia = wx.StaticText(self.pagina_audio, label="Voz propia:")
+        self.selector_voz_propia = wx.Choice(self.pagina_audio)
+        self.selector_voz_propia.Bind(wx.EVT_CHOICE, self._al_cambiar_voz_afinador)
+        etiqueta_velocidad_voz = wx.StaticText(self.pagina_audio, label="Velocidad de la voz propia (de -10 a 10):")
+        self.control_velocidad_voz = wx.SpinCtrl(self.pagina_audio, min=-10, max=10, initial=0)
+        self.control_velocidad_voz.SetLabel("Velocidad de la voz propia")
+        self.control_velocidad_voz.Bind(wx.EVT_SPINCTRL, self._al_cambiar_voz_afinador)
+        etiqueta_volumen_voz = wx.StaticText(self.pagina_audio, label="Volumen de la voz propia (de 0 a 100):")
+        self.control_volumen_voz = wx.SpinCtrl(self.pagina_audio, min=0, max=100, initial=100)
+        self.control_volumen_voz.SetLabel("Volumen de la voz propia")
+        self.control_volumen_voz.Bind(wx.EVT_SPINCTRL, self._al_cambiar_voz_afinador)
+        self.boton_probar_voz = wx.Button(self.pagina_audio, label="Probar la voz de las indicaciones")
+        aplicar_icono_boton(self.boton_probar_voz, "reproducir")
+        self.boton_probar_voz.Bind(wx.EVT_BUTTON, self._al_probar_voz_afinador)
+        # ANCLAJE_FIN: CONTROLES_VOZ_AFINADOR
+
         self.boton_atajos = wx.Button(self.pagina_audio, label="Personalizar atajos de teclado...")
         self.boton_atajos.SetHelpText(
             "Abre un diálogo para reasignar, quitar o restablecer los atajos de teclado configurables."
@@ -666,6 +713,9 @@ class VentanaPrincipal(wx.Frame):
                                       etiqueta_sensibilidad, self.control_sensibilidad)),
             ("Referencia e indicaciones", (etiqueta_la4, self.control_la4, etiqueta_verbosidad,
                                             self.selector_verbosidad, self.selector_nomenclatura)),
+            ("Voz de las indicaciones", (self.selector_salida_voz, etiqueta_voz_propia, self.selector_voz_propia,
+                                          etiqueta_velocidad_voz, self.control_velocidad_voz,
+                                          etiqueta_volumen_voz, self.control_volumen_voz, self.boton_probar_voz)),
             ("Personalización", (self.boton_atajos,)),
         )
         principal.Add(self.cuaderno, 1, wx.EXPAND | wx.ALL, 8)
@@ -676,6 +726,7 @@ class VentanaPrincipal(wx.Frame):
                 self.casilla_deteccion_automatica_cuerda, self.boton_abrir_perfiles,
                 self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia,
                 self.casilla_avance_automatico, self.casilla_pitido_confirmacion, self.casilla_modo_solo_escucha,
+                self.casilla_modo_distancia,
             ),
             self.pagina_afinaciones: (self.selector_familia_maqam, self.selector_escala,
                                        self.boton_escucha_previa, self.selector_paso_retoque,
@@ -688,7 +739,8 @@ class VentanaPrincipal(wx.Frame):
                 self.selector_dispositivo, self.selector_canal, self.casilla_exclusivo_wasapi,
                 self.casilla_desmutear_microfono, self.selector_tasa, self.selector_buffer,
                 self.control_ganancia, self.control_sensibilidad, self.control_la4, self.selector_verbosidad,
-                self.selector_nomenclatura, self.boton_atajos,
+                self.selector_nomenclatura, self.selector_salida_voz, self.selector_voz_propia,
+                self.control_velocidad_voz, self.control_volumen_voz, self.boton_probar_voz, self.boton_atajos,
             ),
         }
         self.Bind(wx.EVT_CHAR_HOOK, self._al_navegacion_con_tab)
@@ -861,6 +913,8 @@ class VentanaPrincipal(wx.Frame):
         self.selector_nomenclatura.SetSelection(
             1 if self.ajustes.get("nomenclatura_notas") == "americano" else 0
         )
+        self.casilla_modo_distancia.SetValue(bool(self.ajustes.get("modo_distancia", False)))
+        self._cargar_ajustes_voz_afinador()
 
         familia_maqam = self.ajustes.get("familia_maqam")
         if familia_maqam and self.selector_familia_maqam.FindString(familia_maqam) != wx.NOT_FOUND:
@@ -908,6 +962,11 @@ class VentanaPrincipal(wx.Frame):
             "deteccion_automatica_cuerda": self.casilla_deteccion_automatica_cuerda.GetValue(),
             "instrucciones_detalladas": self.selector_verbosidad.GetSelection() == 1,
             "nomenclatura_notas": "americano" if self.selector_nomenclatura.GetSelection() == 1 else "solfeo",
+            "modo_distancia": self.casilla_modo_distancia.GetValue(),
+            "salida_voz": OPCIONES_SALIDA_VOZ[max(self.selector_salida_voz.GetSelection(), 0)][1],
+            "voz_propia": self.selector_voz_propia.GetStringSelection() or self.ajustes.get("voz_propia"),
+            "velocidad_voz_propia": self.control_velocidad_voz.GetValue(),
+            "volumen_voz_propia": self.control_volumen_voz.GetValue(),
             "escala": self._canonico_seleccionado(self.selector_escala),
             "familia_maqam": self.selector_familia_maqam.GetStringSelection() or "Todas las familias",
             "perfiles_afinacion": self.perfiles_afinacion,
@@ -1897,7 +1956,8 @@ class VentanaPrincipal(wx.Frame):
             return
 
         self.selector_cuerda.SetSelection(mejor_indice)
-        self.anunciador.hablar("Cuerda detectada: {}.".format(preset[mejor_indice][0]))
+        nombre_cuerda, indice_nota, _octava = preset[mejor_indice]
+        self.anunciador.hablar("Cuerda detectada: {}.".format(self._texto_visible_cuerda(nombre_cuerda, indice_nota)))
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
         self._avance_ya_realizado = False
@@ -1909,6 +1969,11 @@ class VentanaPrincipal(wx.Frame):
         self.etiqueta_nivel.SetLabel("Nivel de entrada: {:.3f}".format(rms))
 
         ahora = time.monotonic()
+        # Justo después de un tono de referencia, o mientras la voz del afinador suena por
+        # los altavoces en modo a distancia, lo que capta el micrófono no es la cuerda.
+        if ahora < self._ignorar_microfono_hasta or (
+                self.casilla_modo_distancia.GetValue() and self.anunciador.esta_hablando()):
+            return
         registrar_log = ahora - getattr(self, "_marca_tiempo_ultimo_log_nivel", 0.0) >= 1.0
         if registrar_log:
             self._marca_tiempo_ultimo_log_nivel = ahora
@@ -2009,8 +2074,12 @@ class VentanaPrincipal(wx.Frame):
             if self.casilla_pitido_confirmacion.GetValue():
                 self.generador_tonos.reproducir_confirmacion()
 
+        # Con la detección automática de cuerda es la propia cuerda que suena la que decide
+        # el objetivo: avanzar a la siguiente haría que la detección volviera a la anterior
+        # mientras aún resuena, en un vaivén de anuncios "Siguiente" y "Cuerda detectada".
         if (instruccion == "AFINADA" and cuerda_objetivo is not None and not self._avance_ya_realizado
-                and self.casilla_avance_automatico.GetValue()):
+                and self.casilla_avance_automatico.GetValue()
+                and not self.casilla_deteccion_automatica_cuerda.GetValue()):
             if self._afinada_desde is None:
                 self._afinada_desde = time.monotonic()
             elif time.monotonic() - self._afinada_desde >= SEGUNDOS_ESTABLE_PARA_AVANZAR:
@@ -2029,9 +2098,15 @@ class VentanaPrincipal(wx.Frame):
         self.selector_cuerda.SetSelection(siguiente_posicion)
         self.anunciador.reiniciar_estado()
         self._afinada_desde = None
+        # Sin esto, si la cuerda siguiente ya estaba afinada nunca llegaba a leerse una
+        # instrucción distinta de AFINADA que lo restableciera, y el avance se quedaba parado.
+        self._avance_ya_realizado = False
         self._confirmacion_pendiente = True
+        self._historial_frecuencias.clear()
         self._guardar_ajustes_actuales()
         self.anunciador.hablar("Siguiente: {}".format(self.selector_cuerda.GetStringSelection()))
+        if self.casilla_modo_distancia.GetValue():
+            self._ejecutar_cuando_calle_la_voz(self._reproducir_referencia_a_distancia)
 
     def _al_reproducir_referencia(self, evento):
         if self._reproduciendo_en_bucle:
@@ -2055,7 +2130,7 @@ class VentanaPrincipal(wx.Frame):
             self.boton_referencia.SetLabel("Detener tono de referencia (Ctrl+P)")
             self.generador_tonos.reproducir_en_bucle(frecuencia)
         else:
-            self.generador_tonos.reproducir(frecuencia, duracion=2.0)
+            self.generador_tonos.reproducir(frecuencia, duracion=2.0, al_finalizar=self._al_terminar_tono_referencia)
 
     def _al_cambiar_ajuste_bucle(self, evento):
         if not self.casilla_bucle_referencia.GetValue() and self._reproduciendo_en_bucle:
@@ -2064,6 +2139,77 @@ class VentanaPrincipal(wx.Frame):
             self.boton_referencia.SetLabel("Reproducir tono de referencia (Ctrl+P)")
         self._guardar_ajustes_actuales()
         evento.Skip()
+
+    # ANCLAJE_INICIO: VOZ_AFINADOR
+    def _cargar_ajustes_voz_afinador(self):
+        voces = self.anunciador.listar_voces_propias()
+        self.selector_voz_propia.Set(voces)
+        voz_guardada = self.ajustes.get("voz_propia") or self.anunciador.voz_propia_actual()
+        if voz_guardada and voz_guardada in voces:
+            self.selector_voz_propia.SetStringSelection(voz_guardada)
+        elif voces:
+            self.selector_voz_propia.SetSelection(0)
+        salida_guardada = self.ajustes.get("salida_voz", SALIDA_LECTOR)
+        for posicion, (_texto, valor) in enumerate(OPCIONES_SALIDA_VOZ):
+            if valor == salida_guardada:
+                self.selector_salida_voz.SetSelection(posicion)
+                break
+        self.control_velocidad_voz.SetValue(int(self.ajustes.get("velocidad_voz_propia", 0)))
+        self.control_volumen_voz.SetValue(int(self.ajustes.get("volumen_voz_propia", 100)))
+        self._aplicar_voz_afinador(anunciar=False)
+
+    def _aplicar_voz_afinador(self, anunciar):
+        tipo_pedido = OPCIONES_SALIDA_VOZ[max(self.selector_salida_voz.GetSelection(), 0)][1]
+        tipo_activo = self.anunciador.configurar_salida(
+            tipo_pedido,
+            nombre_voz=self.selector_voz_propia.GetStringSelection() or None,
+            velocidad=self.control_velocidad_voz.GetValue(),
+            volumen=self.control_volumen_voz.GetValue(),
+        )
+        if tipo_pedido == SALIDA_VOZ_PROPIA and tipo_activo != SALIDA_VOZ_PROPIA:
+            logger.warning("la voz propia SAPI5 no está disponible; se mantiene el lector de pantalla")
+            self.selector_salida_voz.SetSelection(0)
+            if anunciar:
+                self.anunciador.hablar(
+                    "No se pudo iniciar la voz propia. Las indicaciones seguirán saliendo por el lector de pantalla."
+                )
+        voz_propia_activa = tipo_activo == SALIDA_VOZ_PROPIA
+        for control in (self.selector_voz_propia, self.control_velocidad_voz, self.control_volumen_voz):
+            control.Enable(voz_propia_activa)
+
+    def _al_cambiar_voz_afinador(self, evento):
+        self._aplicar_voz_afinador(anunciar=True)
+        self._guardar_ajustes_actuales()
+        evento.Skip()
+
+    def _al_probar_voz_afinador(self, evento):
+        self.anunciador.hablar("Así suenan las indicaciones: {}.".format(TEXTOS_INSTRUCCION["SUBE_POCO"]),
+                               interrumpir=True)
+
+    def _ignorar_microfono_un_momento(self):
+        self._ignorar_microfono_hasta = time.monotonic() + SEGUNDOS_MARGEN_TRAS_TONO
+
+    def _al_terminar_tono_referencia(self):
+        """Llamado desde el hilo de reproducción al acabar un tono de referencia."""
+        wx.CallAfter(self._ignorar_microfono_un_momento)
+
+    def _ejecutar_cuando_calle_la_voz(self, funcion, intentos=0):
+        """Espera a que la voz del afinador termine antes de hacer sonar un tono, para que
+        no se pisen por los altavoces. Con un límite, por si la estimación se alarga."""
+        if self.anunciador.esta_hablando() and intentos < INTENTOS_MAXIMOS_ESPERA_FIN_HABLA:
+            wx.CallLater(INTERVALO_MS_ESPERA_FIN_HABLA, self._ejecutar_cuando_calle_la_voz, funcion, intentos + 1)
+            return
+        funcion()
+
+    def _reproducir_referencia_a_distancia(self):
+        """Hace sonar el tono de la cuerda recién seleccionada, sin tener que tocar el teclado."""
+        if self.capturador is None or self._reproduciendo_en_bucle:
+            return
+        frecuencia = self._frecuencia_objetivo_actual()
+        if frecuencia is None:
+            return
+        self.generador_tonos.reproducir(frecuencia, duracion=2.0, al_finalizar=self._al_terminar_tono_referencia)
+    # ANCLAJE_FIN: VOZ_AFINADOR
 
     def _al_cambiar_ajuste_simple(self, evento):
         self._guardar_ajustes_actuales()

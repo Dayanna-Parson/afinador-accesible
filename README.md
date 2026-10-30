@@ -227,6 +227,30 @@ cercana, anunciando "Cuerda detectada: ...". Así no hace falta navegar el selec
 a mano antes de tocar cada una; solo cambia de cuerda seleccionada si la coincidencia es
 razonablemente cercana (55 cents), para no saltar con ruido o armónicos ambiguos.
 
+## Voz de las indicaciones y afinar a distancia
+
+En Audio y ajustes → "Voz de las indicaciones" se elige quién dice las indicaciones:
+
+- **Lector de pantalla** (NVDA, JAWS o Narrador): como siempre.
+- **Voz propia del afinador** (SAPI5): una voz aparte, con su propia voz, velocidad y
+  volumen, que no pasa por el lector. El lector queda libre para leer la interfaz sin que
+  las indicaciones lo corten (ni al revés), y el afinador sabe exactamente cuándo está
+  hablando. El botón "Probar la voz de las indicaciones" sirve para ajustarla.
+
+La casilla "Afinar a distancia" (pestaña Afinar → Comportamiento) es para afinar lejos del
+ordenador, por ejemplo con la lira en la cama y el ordenador en la mesa, usando altavoces:
+
+- Mientras habla el afinador no escucha el micrófono, para que su propia voz no se
+  confunda con la cuerda. Funciona mejor con la voz propia, porque sabe cuándo termina de
+  hablar; con el lector de pantalla tiene que estimarlo y las indicaciones van más lentas.
+- Al avanzar a la siguiente cuerda, anuncia cuál es y hace sonar su tono de referencia,
+  sin tocar el teclado.
+
+Recomendado para afinar a distancia: voz propia con el volumen alto, avance automático
+activado, detección automática de cuerda desactivada, búfer "Alta precisión" y algo más
+de ganancia de entrada. Antes de alejarte, selecciona la primera cuerda, inicia la
+escucha con `Ctrl+E` y, si quieres, pulsa `Ctrl+P` para oír su tono.
+
 ## Nivel de detalle de las instrucciones
 
 El selector "Nivel de detalle de las instrucciones" tiene dos opciones: "Conciso" (la
@@ -269,7 +293,8 @@ iniciar la escucha (requiere `pycaw`, instalado por defecto en Windows vía `req
 
 Al mantener la afinación correcta ("AFINADA") de forma estable durante poco más de un
 segundo, el selector de cuerda avanza automáticamente a la siguiente de la lista (no
-aplica en modo Cromático, que no tiene una secuencia de cuerdas).
+aplica en modo Cromático, que no tiene una secuencia de cuerdas, ni con la detección
+automática de cuerda activa, que ya elige la cuerda por sí sola).
 
 ## Pruebas
 
