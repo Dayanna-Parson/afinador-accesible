@@ -7,3 +7,8 @@ Afinador Accesible — rama de pruebas review-claude
 - Ajuste manual por cuerda en cuarto de tono, semitono o tono, con botones y atajos.
 - Perfiles de afinación guardables y recuperables por instrumento.
 - Ayuda local con F1 e iconos opcionales que nunca sustituyen al texto.
+- Voz propia del afinador (SAPI5), con voz, velocidad y volumen propios, independiente del lector de pantalla.
+- Modo "Afinar a distancia": no escucha mientras habla y reproduce el tono de cada cuerda nueva al avanzar.
+- Corregido: el avance automático se quedaba parado si la cuerda siguiente ya estaba afinada.
+- Corregido: avance automático y detección automática de cuerda ya no se pelean por la cuerda seleccionada.
+- Corregido: el eco de un tono de referencia ya no puede dar una cuerda por afinada.

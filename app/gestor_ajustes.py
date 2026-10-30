@@ -39,6 +39,11 @@ CONFIGURACION_AUDIO_POR_DEFECTO = {
     "deteccion_automatica_cuerda": False,
     "instrucciones_detalladas": False,
     "nomenclatura_notas": "solfeo",
+    "modo_distancia": False,
+    "salida_voz": "lector",
+    "voz_propia": None,
+    "velocidad_voz_propia": 0,
+    "volumen_voz_propia": 100,
 }
 
 AJUSTES_AFINACION_POR_DEFECTO = {

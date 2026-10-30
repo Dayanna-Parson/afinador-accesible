@@ -40,6 +40,8 @@ Anclajes existentes:
 | `generador_tonos` | `app/motor_audio.py` |
 | `api_nvda` | `app/conector_nvda.py` |
 | `ventana_principal` | `app/interfaz/ventana_principal.py` |
+| `CONTROLES_VOZ_AFINADOR` | `app/interfaz/ventana_principal.py` |
+| `VOZ_AFINADOR` | `app/interfaz/ventana_principal.py` |
 
 ### Cambios quirúrgicos
 Nunca reescribas un archivo completo si solo hay que modificar un bloque. Entrega únicamente el bloque ANCLAJE afectado y el contexto mínimo necesario para ubicarlo. Menos tokens, menos riesgo de romper lo que ya funciona.
@@ -54,7 +56,7 @@ Nunca reescribas un archivo completo si solo hay que modificar un bloque. Entreg
 | Lenguaje principal | Python 3.12+ |
 | Captura de audio y DSP (opcional, preferente) | Rust + `cpal` + YIN propio, compilado como extensión nativa vía PyO3 (`motor_rust/`) |
 | Captura de audio y DSP (respaldo) | `sounddevice` + `numpy`, YIN propio en Python puro |
-| Anuncios de interfaz para NVDA/JAWS/Narrador | `accessible_output3` (`app/conector_nvda.py`) — habla directo al lector de pantalla activo |
+| Anuncios de interfaz para NVDA/JAWS/Narrador | `accessible_output3` (`app/conector_nvda.py`) — habla directo al lector de pantalla activo, o a una voz SAPI5 propia del afinador (salida `sapi5` de la misma librería) |
 | Generación de tono de referencia | `numpy` (onda senoidal con envolvente) + `sounddevice.play` |
 
 No añadas dependencias sin justificación explícita. Cada librería nueva es un punto de rotura potencial en la portabilidad.
@@ -78,7 +80,8 @@ La extensión Rust se compila con `maturin` (ver `motor_rust/pyproject.toml` y e
 app/
 ├── motor_audio.py     # CapturadorYIN (despachador Rust/Python), _CapturadorYINPuroPython
 │                       # (respaldo), YIN en Python puro, GeneradorTonos, conversión nota↔frecuencia
-├── conector_nvda.py    # AnunciadorNVDA: accessible_output3 + throttling por estabilidad (350 ms)
+├── conector_nvda.py    # AnunciadorNVDA: accessible_output3 (lector o voz SAPI5 propia) + throttling
+│                       # por estabilidad (350 ms) + esta_hablando()
 ├── interfaz_gui.py     # Compatibilidad temporal: reexporta VentanaPrincipal desde interfaz/
 ├── interfaz/
 │   └── ventana_principal.py  # VentanaPrincipal: wx.Frame raíz, pestañas, flujo de captura
@@ -102,7 +105,8 @@ tests/
 │                          # cada maqam coincide con sus siete grados de referencia)
 ├── test_perfiles_afinacion.py  # Separación de perfiles por instrumento y migración de los antiguos
 ├── test_gestor_ajustes.py      # Migración y copias rotativas de ajustes
-└── test_gestor_atajos.py       # Fusión de defaults y overrides de atajos de teclado
+├── test_gestor_atajos.py       # Fusión de defaults y overrides de atajos de teclado
+└── test_conector_nvda.py       # Salida de voz (lector/voz propia) y detección de «está hablando»
 iniciar_afinador.py        # Punto de entrada, configura logging a afinador.log
 requisitos.txt             # Dependencias de Python
 INICIAR_AFINADOR.bat        # Lanzador para Windows
@@ -273,6 +277,34 @@ de recordar cómo sonaba la cuerda anterior. Las cuerdas sin retoque suenan una 
 (el texto de `TEXTOS_INSTRUCCION` tal cual) y detallado, que le añade los cents exactos con
 `.format()` después de traducir/construir el texto base — nunca antes, para no romper el
 diccionario `TEXTOS_INSTRUCCION` con cadenas dinámicas.
+
+### Voz propia del afinador y afinar a distancia
+`AnunciadorNVDA` tiene dos salidas, ambas de `accessible_output3` (sin dependencias nuevas):
+el lector de pantalla activo (por defecto) o una voz SAPI5 propia (`SALIDA_VOZ_PROPIA`,
+elegida en Audio y ajustes → "Voz de las indicaciones", con voz, velocidad y volumen propios
+persistidos como `salida_voz`, `voz_propia`, `velocidad_voz_propia`, `volumen_voz_propia`).
+La voz propia deja el lector libre para la interfaz y no compite con su cola de voz; si no se
+puede iniciar, `configurar_salida()` devuelve el lector y la interfaz vuelve a esa opción.
+Con la voz propia, `procesar_instruccion()` interrumpe la indicación anterior en vez de
+encolarla.
+
+`esta_hablando()` dice si la voz del afinador puede estar sonando por los altavoces: con la
+voz propia consulta el estado real de SAPI5 (`Status.RunningState`); con el lector solo puede
+estimarlo por la longitud del texto. Más un margen de reverberación en ambos casos.
+
+La casilla `casilla_modo_distancia` (persistida como `modo_distancia`, desactivada por
+defecto) es para afinar lejos del ordenador con altavoces: `_actualizar_deteccion` descarta lo
+que capta el micrófono mientras `esta_hablando()` es cierto (si no, la propia voz se detecta
+como si fuera la cuerda), y `_avanzar_a_siguiente_cuerda` reproduce el tono de referencia de
+la cuerda nueva en cuanto la voz termina de anunciarla (`_ejecutar_cuando_calle_la_voz`).
+Independientemente de ese modo, tras cualquier tono de referencia no en bucle se ignora el
+micrófono `SEGUNDOS_MARGEN_TRAS_TONO`: la reverberación del tono tiene la frecuencia
+objetivo exacta y podía disparar un "Afinada" falso. Cada clave nueva de ajustes debe
+añadirse también a `CONFIGURACION_AUDIO_POR_DEFECTO` o `AJUSTES_AFINACION_POR_DEFECTO`
+(`gestor_ajustes.py`): `_separar()` descarta en silencio las claves que no conoce.
+
+El avance automático de cuerda no actúa con la detección automática de cuerda activa: las dos
+se pelean por la cuerda seleccionada mientras la anterior aún resuena.
 
 ### Errores: nunca silenciosos
 Prohibido `except: pass` o `except Exception: pass` sin logging. Mínimo:
