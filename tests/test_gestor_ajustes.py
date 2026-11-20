@@ -44,3 +44,18 @@ class PruebasPersistenciaAjustes(unittest.TestCase):
                 self.assertTrue(os.path.isfile(rutas["RUTA_AJUSTES_LEGADOS"]))
                 self.assertTrue(os.path.isfile(rutas["RUTA_CONFIGURACION_AUDIO"]))
                 self.assertTrue(os.path.isfile(rutas["RUTA_AJUSTES_AFINACION"]))
+
+    def test_conserva_la_voz_propia_y_el_modo_a_distancia(self):
+        with tempfile.TemporaryDirectory() as carpeta:
+            rutas = self._rutas_temporales(carpeta)
+            with patch.multiple(gestor_ajustes, **rutas):
+                gestor_ajustes.guardar_ajustes({
+                    "modo_distancia": True, "salida_voz": "voz_propia", "voz_propia": "Voz B",
+                    "velocidad_voz_propia": -2, "volumen_voz_propia": 90,
+                })
+                datos = gestor_ajustes.cargar_ajustes()
+                self.assertTrue(datos["modo_distancia"])
+                self.assertEqual(datos["salida_voz"], "voz_propia")
+                self.assertEqual(datos["voz_propia"], "Voz B")
+                self.assertEqual(datos["velocidad_voz_propia"], -2)
+                self.assertEqual(datos["volumen_voz_propia"], 90)
