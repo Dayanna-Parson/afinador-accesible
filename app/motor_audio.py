@@ -8,6 +8,8 @@ import time
 import numpy as np
 import sounddevice as sd
 
+from app.muestras_referencia import BancoMuestrasReferencia
+
 try:
     import motor_rust as _motor_rust
     if not hasattr(_motor_rust, "CapturadorYinRust"):
@@ -505,6 +507,11 @@ class GeneradorTonos:
         self._detener_bucle = threading.Event()
         self._bloqueo_reproduccion = threading.Lock()
         self._identificador_reproduccion = 0
+        # Sonidos grabados de recursos/sonidos/referencias/ en vez de la onda sintética,
+        # cuando existen. carpeta_instrumento elige una subcarpeta propia del instrumento.
+        self.banco_muestras = BancoMuestrasReferencia()
+        self.usar_muestras = True
+        self.carpeta_instrumento = None
 
     def _iniciar_reproduccion(self):
         """Invalida cualquier reproducción anterior y devuelve su nuevo identificador.
@@ -564,26 +571,40 @@ class GeneradorTonos:
             onda *= envolvente
         return onda.astype(np.float32)
 
-    def _reproducir_bloqueante(self, frecuencia, duracion, amplitud, al_finalizar, identificador):
+    def _onda_referencia(self, frecuencia, duracion, amplitud):
+        """Sonido grabado a la frecuencia pedida si lo hay; si no, la onda sintética."""
+        if self.usar_muestras:
+            onda = self.banco_muestras.generar_onda(
+                frecuencia, duracion, self.tasa_muestreo,
+                self._compensar_percepcion_grave(frecuencia, amplitud), self.carpeta_instrumento,
+            )
+            if onda is not None:
+                return onda
+        return self._generar_onda(frecuencia, duracion, amplitud)
+
+    def _reproducir_bloqueante(self, frecuencia, duracion, amplitud, al_finalizar, identificador, usar_muestra):
         if self.capturador is not None:
             self.capturador.pausar()
         try:
             if not self._es_reproduccion_actual(identificador):
                 return
-            onda = self._generar_onda(frecuencia, duracion, amplitud)
+            if usar_muestra:
+                onda = self._onda_referencia(frecuencia, duracion, amplitud)
+            else:
+                onda = self._generar_onda(frecuencia, duracion, amplitud)
             sd.play(onda, samplerate=self.tasa_muestreo, blocking=True)
         except Exception:
             logger.exception("fallo al reproducir el tono de referencia")
         finally:
             self._finalizar_reproduccion(identificador, al_finalizar)
 
-    def reproducir(self, frecuencia, duracion=2.0, amplitud=0.45, al_finalizar=None):
+    def reproducir(self, frecuencia, duracion=2.0, amplitud=0.45, al_finalizar=None, usar_muestra=True):
         """Reproduce el tono en un hilo secundario, pausando la captura mientras suena."""
         identificador = self._iniciar_reproduccion()
         sd.stop()
         self._hilo_reproduccion = threading.Thread(
             target=self._reproducir_bloqueante,
-            args=(frecuencia, duracion, amplitud, al_finalizar, identificador),
+            args=(frecuencia, duracion, amplitud, al_finalizar, identificador, usar_muestra),
             daemon=True,
         )
         self._hilo_reproduccion.start()
@@ -592,7 +613,7 @@ class GeneradorTonos:
         if self.capturador is not None:
             self.capturador.pausar()
         try:
-            onda = self._generar_onda(frecuencia, duracion, amplitud)
+            onda = self._onda_referencia(frecuencia, duracion, amplitud)
             while self._es_reproduccion_actual(identificador) and not self._detener_bucle.is_set():
                 sd.play(onda, samplerate=self.tasa_muestreo, blocking=True)
                 if self._detener_bucle.wait(timeout=pausa):
@@ -627,7 +648,7 @@ class GeneradorTonos:
             for frecuencia in frecuencias:
                 if not self._es_reproduccion_actual(identificador) or self._detener_bucle.is_set():
                     break
-                onda = self._generar_onda(frecuencia, duracion, amplitud)
+                onda = self._onda_referencia(frecuencia, duracion, amplitud)
                 sd.play(onda, samplerate=self.tasa_muestreo, blocking=True)
                 if self._detener_bucle.wait(timeout=pausa):
                     break
@@ -654,5 +675,6 @@ class GeneradorTonos:
 
     def reproducir_confirmacion(self, frecuencia=880.0, duracion=0.15, amplitud=0.25):
         """Pitido corto de confirmación al alcanzar la afinación correcta."""
-        self.reproducir(frecuencia, duracion=duracion, amplitud=amplitud)
+        # Siempre sintético: es una señal, no una nota que haya que imitar.
+        self.reproducir(frecuencia, duracion=duracion, amplitud=amplitud, usar_muestra=False)
 # ANCLAJE_FIN: generador_tonos

@@ -150,6 +150,13 @@ TAMANO_HISTORIAL_FRECUENCIAS = 5
 SEGUNDOS_MARGEN_TRAS_TONO = 0.4
 INTERVALO_MS_ESPERA_FIN_HABLA = 100
 INTENTOS_MAXIMOS_ESPERA_FIN_HABLA = 100
+# Subcarpeta de recursos/sonidos/referencias/ con los sonidos propios de cada instrumento.
+# Si no existe o está vacía, se usan los sonidos generales de referencias/.
+CARPETAS_SONIDOS_INSTRUMENTO = {
+    NOMBRE_LIRA: "lira",
+    NOMBRE_GUITARRA: "guitarra",
+    NOMBRE_UKELELE: "ukelele",
+}
 OPCIONES_SALIDA_VOZ = [
     ("Lector de pantalla (NVDA, JAWS o Narrador)", SALIDA_LECTOR),
     ("Voz propia del afinador (SAPI5, independiente del lector)", SALIDA_VOZ_PROPIA),
@@ -486,6 +493,14 @@ class VentanaPrincipal(wx.Frame):
         self.casilla_bucle_referencia = wx.CheckBox(self.pagina_afinar, label="Repetir el tono de referencia en bucle")
         self.casilla_bucle_referencia.SetValue(False)
         self.casilla_bucle_referencia.Bind(wx.EVT_CHECKBOX, self._al_cambiar_ajuste_bucle)
+        self.casilla_sonidos_grabados = wx.CheckBox(
+            self.pagina_afinar, label="Usar sonidos grabados para el tono de referencia"
+        )
+        self.casilla_sonidos_grabados.SetHelpText(
+            "Si se desmarca, o no hay sonidos en recursos/sonidos/referencias, se usa el tono sintético."
+        )
+        self.casilla_sonidos_grabados.SetValue(True)
+        self.casilla_sonidos_grabados.Bind(wx.EVT_CHECKBOX, self._al_cambiar_sonidos_grabados)
         self.casilla_avance_automatico = wx.CheckBox(
             self.pagina_afinar, label="Avanzar automáticamente a la siguiente cuerda al afinar"
         )
@@ -519,7 +534,8 @@ class VentanaPrincipal(wx.Frame):
             ("Afinaciones personales", (self.boton_abrir_perfiles,)),
             ("Durante la afinación", (self.etiqueta_nota, self.etiqueta_instruccion, self.etiqueta_nivel,
                                          self.etiqueta_visual_afinacion, self.indicador_desviacion, etiqueta_escala_visual,
-                                         self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia)),
+                                         self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia,
+                                         self.casilla_sonidos_grabados)),
             ("Comportamiento", (self.casilla_avance_automatico, self.casilla_pitido_confirmacion,
                                  self.casilla_modo_solo_escucha, self.casilla_modo_distancia)),
         )
@@ -725,7 +741,7 @@ class VentanaPrincipal(wx.Frame):
                 self.selector_instrumento, self.selector_escala_rapida, self.selector_cuerda,
                 self.casilla_deteccion_automatica_cuerda, self.boton_abrir_perfiles,
                 self.boton_escucha, self.boton_referencia, self.casilla_bucle_referencia,
-                self.casilla_avance_automatico, self.casilla_pitido_confirmacion, self.casilla_modo_solo_escucha,
+                self.casilla_sonidos_grabados, self.casilla_avance_automatico, self.casilla_pitido_confirmacion, self.casilla_modo_solo_escucha,
                 self.casilla_modo_distancia,
             ),
             self.pagina_afinaciones: (self.selector_familia_maqam, self.selector_escala,
@@ -914,6 +930,8 @@ class VentanaPrincipal(wx.Frame):
             1 if self.ajustes.get("nomenclatura_notas") == "americano" else 0
         )
         self.casilla_modo_distancia.SetValue(bool(self.ajustes.get("modo_distancia", False)))
+        self.casilla_sonidos_grabados.SetValue(bool(self.ajustes.get("usar_sonidos_referencia", True)))
+        self.generador_tonos.usar_muestras = self.casilla_sonidos_grabados.GetValue()
         self._cargar_ajustes_voz_afinador()
 
         familia_maqam = self.ajustes.get("familia_maqam")
@@ -963,6 +981,7 @@ class VentanaPrincipal(wx.Frame):
             "instrucciones_detalladas": self.selector_verbosidad.GetSelection() == 1,
             "nomenclatura_notas": "americano" if self.selector_nomenclatura.GetSelection() == 1 else "solfeo",
             "modo_distancia": self.casilla_modo_distancia.GetValue(),
+            "usar_sonidos_referencia": self.casilla_sonidos_grabados.GetValue(),
             "salida_voz": OPCIONES_SALIDA_VOZ[max(self.selector_salida_voz.GetSelection(), 0)][1],
             "voz_propia": self.selector_voz_propia.GetStringSelection() or self.ajustes.get("voz_propia"),
             "velocidad_voz_propia": self.control_velocidad_voz.GetValue(),
@@ -1093,6 +1112,7 @@ class VentanaPrincipal(wx.Frame):
         self._refrescar_lista_cuerdas(conservar_seleccion=False)
 
         instrumento = self.selector_instrumento.GetStringSelection()
+        self.generador_tonos.carpeta_instrumento = CARPETAS_SONIDOS_INSTRUMENTO.get(instrumento)
         es_lira = instrumento == NOMBRE_LIRA
         self.selector_familia_maqam.Enable(es_lira)
         for control in (
@@ -2210,6 +2230,11 @@ class VentanaPrincipal(wx.Frame):
             return
         self.generador_tonos.reproducir(frecuencia, duracion=2.0, al_finalizar=self._al_terminar_tono_referencia)
     # ANCLAJE_FIN: VOZ_AFINADOR
+
+    def _al_cambiar_sonidos_grabados(self, evento):
+        self.generador_tonos.usar_muestras = self.casilla_sonidos_grabados.GetValue()
+        self._guardar_ajustes_actuales()
+        evento.Skip()
 
     def _al_cambiar_ajuste_simple(self, evento):
         self._guardar_ajustes_actuales()

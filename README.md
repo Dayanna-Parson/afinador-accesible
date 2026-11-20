@@ -227,6 +227,15 @@ cercana, anunciando "Cuerda detectada: ...". Así no hace falta navegar el selec
 a mano antes de tocar cada una; solo cambia de cuerda seleccionada si la coincidencia es
 razonablemente cercana (55 cents), para no saltar con ruido o armónicos ambiguos.
 
+## Sonidos del tono de referencia
+
+El tono de referencia (`Ctrl+P`), su bucle y "Reproducir la afinación completa" usan los
+sonidos WAV de `recursos/sonidos/referencias/`, reajustados a la frecuencia exacta de cada
+cuerda, también con retoques, con otra referencia de La4 y para la guitarra y el ukelele.
+Si no hay sonidos, o se desmarca "Usar sonidos grabados para el tono de referencia" en la
+pestaña Afinar, se usa el tono sintético. Los sonidos actuales son provisionales. Para
+poner las grabaciones reales de un instrumento, ver `recursos/sonidos/LEEME.md`.
+
 ## Voz de las indicaciones y afinar a distancia
 
 En Audio y ajustes → "Voz de las indicaciones" se elige quién dice las indicaciones:
